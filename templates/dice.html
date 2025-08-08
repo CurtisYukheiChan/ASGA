@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dice Game</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background: #1e1e2f;
+      color: #f0f0f0;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: 0 auto;
+    }
+
+    input, button {
+      padding: 8px 12px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: none;
+      background-color: #2e7d32;
+      color: white;
+      margin: 5px;
+      transition: 0.2s;
+    }
+
+    button:hover {
+      background-color: #388e3c;
+    }
+
+    input {
+      width: 100px;
+      text-align: center;
+      background: #111;
+      color: white;
+      border: 1px solid #444;
+    }
+
+    .controls {
+      margin: 20px 0;
+    }
+
+    .result-bar {
+      width: 100%;
+      background: #333;
+      height: 30px;
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+      margin-top: 20px;
+    }
+.top-right-buttons button {
+    position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;  /* stack vertically */
+  align-items: flex-end;   /* right align */
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  background-color: #2e7d32;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.top-right-buttons button:hover {
+  background-color: #388e3c;
+}
+.number-bar {
+  position: relative;
+  height: 20px;
+  width: 100%;
+  max-width: 600px;
+  margin: 30px auto 30px; /* 30px top and bottom, auto left-right */
+  background: linear-gradient(to right, #c62828 0%, #c62828 50%, #2e7d32 50%, #2e7d32 100%);
+  border-radius: 10px;
+}
+
+.indicator {
+  height: 100%;
+  width: 4px;
+  background: yellow;
+  position: absolute;
+  top: 0;
+  transition: left 0.5s ease-out;
+}
+
+.indicator span {
+  position: absolute;
+  top: -25px;
+  left: -15px;
+  color: yellow;
+  font-size: 14px;
+  background: #222;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+
+    #rollButton {
+      margin-top: 20px;
+    }
+
+    #outcome {
+      margin-top: 20px;
+      font-size: 20px;
+    }
+
+
+
+  </style>
+</head>
+<body>
+
+<div class="top-right-buttons">
+  <button onclick="window.location.href='mines'">Mines</button>
+</div>
+
+  <div class="container">
+    <h1>Dice</h1>
+    <div class="controls">
+        <div id="balanceDisplay" style="margin-top: 15px; font-size: 20px;">
+  Balance: $<span id="balance">1000.00</span>
+</div>
+      <input type="number" id="betAmount" value="100" min="1" />
+      <button onclick="adjustBet(0.5)">½</button>
+      <button onclick="adjustBet(2)">2×</button>
+    </div>
+
+    <div>
+      <p>Potential Winnings: <span id="potentialWinnings">$196.00</span></p>
+    </div>
+
+    <button id="rollButton" onclick="rollDice()">Roll Dice</button>
+
+<div class="number-bar">
+  <div id="indicator" class="indicator">
+    <span id="hoverValue">0.00</span>
+  </div>
+</div>
+
+
+    </div>
+
+    <div id="outcome"></div>
+  </div>
+
+  <script>
+let balance = 1000; // default balance
+
+const savedBalance = localStorage.getItem('balance');
+if (savedBalance !== null) {
+  const parsed = parseFloat(savedBalance);
+  if (!isNaN(parsed)) {
+    balance = parsed;
+  } else {
+    balance = 1000; // fallback if parsing fails
+  }
+}
+
+// Now update UI
+updateBalanceDisplay();
+
+const betInput = document.getElementById('betAmount');
+const winningsDisplay = document.getElementById('potentialWinnings');
+const indicator = document.getElementById('indicator');
+const outcomeDisplay = document.getElementById('outcome');
+
+const houseEdge = 0.98;
+
+betInput.addEventListener('input', updateWinnings);
+
+function adjustBet(multiplier) {
+  let current = parseFloat(betInput.value) || 0;
+  betInput.value = Math.max(1, (current * multiplier).toFixed(2));
+  updateWinnings();
+}
+
+function updateWinnings() {
+  const bet = parseFloat(betInput.value);
+  if (!isNaN(bet)) {
+    const winMultiplier = (1 / 0.5) * houseEdge;
+    winningsDisplay.textContent = `$${(bet * winMultiplier).toFixed(2)}`;
+  }
+}
+
+function rollDice() {
+  const bet = parseFloat(betInput.value);
+  if (isNaN(bet) || bet <= 0) {
+    alert("Enter a valid bet amount.");
+    return;
+  }
+
+  if (bet > balance) {
+    alert("Insufficient balance.");
+    return;
+  }
+
+  // Animate rolling (fake spin for 1s)
+  let fakeInterval;
+  let elapsed = 0;
+  const spinDuration = 1000;
+
+  fakeInterval = setInterval(() => {
+    const fakeNum = (Math.random() * 100).toFixed(2);
+    moveIndicator(fakeNum);
+    elapsed += 50;
+    if (elapsed >= spinDuration) {
+      clearInterval(fakeInterval);
+
+      // Final result
+      const result = parseFloat((Math.random() * 100).toFixed(2));
+      moveIndicator(result);
+
+      let winnings = 0;
+      if (result >= 50) {
+        winnings = bet * 2 * houseEdge;
+        balance += (winnings - bet); // Add net profit
+        showMessage(`You won! Rolled ${result.toFixed(2)} and earned $${winnings.toFixed(2)}`);
+      } else {
+        balance -= bet;
+        showMessage(`You lost! Rolled ${result.toFixed(2)} and lost $${bet.toFixed(2)}`);
+      }
+
+      updateBalanceDisplay();
+      localStorage.setItem('balance', balance.toFixed(2)); // SAVE updated balance here
+    }
+  }, 50);
+}
+
+function showMessage(msg) {
+  outcomeDisplay.textContent = msg;
+}
+
+function moveIndicator(value) {
+  const percent = Math.min(100, Math.max(0, parseFloat(value)));
+  const indicator = document.getElementById('indicator');
+  const label = document.getElementById('hoverValue');
+
+  indicator.style.left = `calc(${percent}% - 2px)`; // center the 4px wide line
+  label.textContent = parseFloat(value).toFixed(2);
+}
+
+function updateBalanceDisplay() {
+  document.getElementById('balance').textContent = balance.toFixed(2);
+}
+
+updateWinnings(); // initial
+
+  </script>
+</body>
+</html>

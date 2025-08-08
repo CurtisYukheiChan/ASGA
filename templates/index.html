@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>ASGA</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='ASGA_logo.png') }}">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600&display=swap">
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+  <style>
+    :root {
+      --bg-color: #f5f7fa;
+      --text-color: #333;
+      --card-bg: #fff;
+      --input-bg: #fff;
+      --border-color: #ccc;
+      --highlight: #2c3e50;
+      --shadow: rgba(0, 0, 0, 0.05);
+    }
+
+    body.dark-mode {
+      --bg-color: #1e1e2f;
+      --text-color: #ddd;
+      --card-bg: #2b2b3d;
+      --input-bg: #3a3a50;
+      --border-color: #555;
+      --highlight: #00acc1;
+      --shadow: rgba(0, 0, 0, 0.3);
+    }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      max-width: 850px;
+      margin: auto;
+      padding: 20px;
+      background: var(--bg-color);
+      color: var(--text-color);
+      transition: background 0.3s, color 0.3s;
+    }
+
+    h1 {
+      text-align: center;
+      color: var(--highlight);
+    }
+
+    fieldset {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      margin: 20px 0;
+      padding: 20px;
+      box-shadow: 0 2px 5px var(--shadow);
+      transition: background 0.3s, border 0.3s;
+    }
+
+    label {
+      display: block;
+      margin-top: 12px;
+      font-weight: 500;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      margin-top: 6px;
+      background: var(--input-bg);
+      color: var(--text-color);
+      box-sizing: border-box;
+      transition: background 0.3s, color 0.3s, border 0.3s;
+    }
+
+    input[type="checkbox"] {
+      width: auto;
+      margin-right: 8px;
+    }
+
+    .button-row {
+      text-align: center;
+      margin: 20px 0;
+    }
+
+    button {
+      background: var(--highlight);
+      color: white;
+      border: none;
+      padding: 10px 24px;
+      font-size: 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 8px;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+        background: #1a73e8;
+        color: white;
+    }
+
+
+
+    pre {
+      background: #eef1f5;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+
+    body.dark-mode pre {
+      background: #2e2e42;
+      color: #ccc;
+    }
+
+   /* ✅ Add this at the bottom */
+    .toggle-btn {
+      background: var(--highlight);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      font-size: 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    .toggle-btn.collapsed::before {
+      content: '▶ ';
+    }
+
+    .toggle-btn.expanded::before {
+      content: '▼ ';}
+
+.collapsible {
+  position: absolute;
+  top: 50px;
+  left: 0;
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.collapsible.expanded {
+  opacity: 1;
+  pointer-events: auto;
+  z-index: 1;
+}
+/* Horizontal toggle button row */
+.toggle-button-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.toggle-button-row .toggle-btn {
+  margin-top: 0;
+}
+
+/* Ensure all collapsible fieldsets take full width */
+fieldset.collapsible,
+fieldset.collapsible.expanded {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.settings-container {
+  position: relative;
+  width: 100%;
+}
+
+.collapsible-panel {
+
+  position: relative;
+  min-height: 330px; /* or whatever height you need */
+}
+
+.field-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.field-row label {
+  min-width: 150px; /* or whatever width you want */
+}
+.field-row input {
+  margin-left: 10px;
+  padding: 4px 6px;
+  flex-shrink: 0;
+}
+
+.tooltip {
+  display: inline-block;
+  margin-left: 6px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  border: 2px solid #666;
+  border-radius: 50%;
+  text-align: center;
+  font-weight: bold;
+  font-size: 14px;
+  color: #666;
+  cursor: help;
+  user-select: none;
+}
+/* Tooltip box that appears on hover */
+.tooltip[aria-label]::after {
+  content: attr(aria-label);
+  position: absolute;
+  top: 50%;
+  left: 100%; /* position right after the tooltip circle */
+  transform: translate(8px, -50%);
+  white-space: nowrap;
+  background: #333;
+  color: white;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+  width: max-content;
+  max-width: 250px;
+}
+
+/* Show the tooltip text on hover */
+.tooltip:hover::after {
+  opacity: 0.9;
+}
+
+.top-right-buttons {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;  /* Align buttons by left edge */
+  gap: 20px;
+
+  width: 140px;             /* Fix container width to button width */
+}
+
+.top-right-buttons button {
+  width: 100%;              /* Fill container width */
+  height: 40px;
+  text-align: center;
+}
+
+.button-for-col button {
+  width: 140px;
+  height: 40px;
+  padding: 10px 20px;
+  font-size: 16px;
+  background: #222;
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  text-align: center;
+}
+
+
+
+    /* The Modal  */
+    .modal {
+      display: none; /* Hidden initially */
+      position: fixed;
+      z-index: 999;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.5); /* Overlay effect */
+    }
+
+    /* Modal content box */
+    .modal-content {
+      background-color: #fff;
+      margin: 10% auto;
+      padding: 20px;
+      border-radius: 8px;
+      width: 80%;
+      max-width: 600px;
+      position: relative;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+    /* Close button */
+    .close {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      font-size: 24px;
+      font-weight: bold;
+      color: #aaa;
+      cursor: pointer;
+    }
+
+    .close:hover {
+      color: #000;
+    }
+
+  </style>
+</head>
+<body>
+  <!-- Top-right button container -->
+<div class="top-right-buttons">
+  <button id="dark_mode_toggle">Dark Mode</button>
+  <button onclick="window.open('/mines', '_blank')">Mini games</button>
+  <button onclick="openModal()">User Guide</button>
+</div>
+
+    <!-- Modal Structure -->
+  <div id="termsModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeModal()">&times;</span>
+      <h2>How to use</h2>
+      <p>
+        1. Click get survey form and copy the google form<br>
+        2. Edit questions in relevant technical skills (do not remove the word skill)<br>
+        3. Sent out the form for participants to fill<br>
+        4. Export survey result as .CSV<br>
+        5. Upload .CSV file and specify the group size<br>
+        6. Change relevant settings to specify which parameters to prioritise when creating groups, then start allocation<br>
+      </p>
+      <h2>Survey customization</h2>
+      <p>
+        The algorithm detects the answers to questions by detecting keywords in the question of the survey.
+        The following keywords are used for assigning questions and answers to their respective catagories: name, email, gender, english (with respect with ESL), skill, personality, introvert & extrovert, grade, whitelist, blacklist, teamwork.
+        As long as they keyword exist only in the relevant question it can be phrased in any formate. e.g. for question asking for email can be phrased as "company email", "school email" or "email".<br>
+        <ul>
+      <li>In questions for motivation, questions can be rephrased as any other question as long as "strongly agree" indicates a higher level of motivation than "strongly disagree"</li>
+      <li>In question for target grade, the answers can be rephrased in any way as long as the beginning of each answer is rated 1-5 e.g. "5. 90-100%", "5. High first class" </li>
+      <li>Teamwork questions cannot be edited as the score is mapped to each specific question, but they can be deleted if the orginizer wishes to reduce the length of the survey</li>
+    </ul>
+      </p>
+      <h2>Solver settings</h2>
+      Combined algorithm is recommended as it generates groupings in the most balanced manner. Local search is the fastest but tends to get stuck at local minima and does not take weightings into account.
+      Genetic is the slowest and is not recommended as the search is too global.
+      <h2>Advanced settings</h2>
+      Weightings are used to tell the algorithm what variables the organizer deem is more important than others when creating groups. Normalise technical skill score should be enabled when the majority of participants have a low level of confidence/experience in their relevant skill level.
+      <h2>Student forming their own groups</h2>
+      By default the algorithm allows the participants to name 2 other participants to be preferibily in their group, and two other preferibily excluded from their group.
+      This can be adjusted in advanced settings using whitelist and blacklist limits to allow participants to have more prefered groupmates or remove this function entirely by setting both limits to 0.
+      <h2>Contacts</h2>
+      This software is created by Curtis Chan, if there are any inquaries or technical problems please email curtischanyukhei.hr@gmail.com, we aim to respond in 5 business days.
+
+
+
+    </div>
+  </div>
+
+
+
+  <!-- Main content -->
+  <div style="display: flex; align-items: center; gap: 10px; margin-top: 30px;">
+    <img src="{{ url_for('static', filename='ASGA_logo_named.png') }}" alt="ASGA Logo" style="height: 120px;">
+    <h1>Advanced Survey-based Group Allocator</h1>
+  </div>
+
+
+  <form id="alloc-form">
+    <!-- Basic Settings -->
+    <fieldset>
+      <legend>Basic Settings</legend>
+      <label>Number of participants:</label>
+      <input type="number" id="num_participants" name="num_participants" required />
+      <label>Group size:</label>
+      <input type="number" id="group_size" name="group_size" required />
+      <label>Upload survey results (CSV/XLSX):</label>
+      <input type="file" id="participant_file" accept=".csv,.xlsx" required />
+    </fieldset>
+
+    <!-- Advanced Settings -->
+    <div class="settings-container">
+<div class="toggle-button-row">
+  <button type="button" class="toggle-btn" data-target="advanced_settings">▶ Advanced Settings</button>
+  <button type="button" class="toggle-btn" data-target="solver_settings">▶ Solver Settings</button>
+  <button type="button" class="toggle-btn" data-target="output_settings">▶ Output Settings</button>
+  </div>
+
+<div class="collapsible-panel">
+      <fieldset class="collapsible" id="advanced_settings">
+        <legend>Advanced Settings</legend>
+
+        <label for="skill_weight">Skill Weight: <span class="tooltip" title="Importance of balancing technical skills when forming groups (0-1)">?</span></label>
+        <input type="number" step="0.01" id="skill_weight" value="0.9" />
+        <label for="motivation_weight" title="Weight given to participant motivation">Motivation weight:<span class="tooltip" title="Weight given to participant motivation">?</span></label>
+        <input type="number" step="0.01" id="motivation_weight" value="3" />
+        <label for="min_skill" title="Minimum technical skill level of any skill in any group">Skill Floor:<span class="tooltip" title="Minimum technical skill level of any skill in any group (0-1)">?</span></label><input type="number" step="0.01" id="min_skill" value="1" />
+        <label for="ESL_weight" title="Weight given to balancing ESL (English as Second Language) students">ESL Weight:<span class="tooltip" title="Weight given to balancing ESL (English as Second Language) students">?</span></label>
+        <input type="number" step="0.01" id="ESL_weight" value="0.8" />
+        <label for="gender_weight" title="Weight given to create pairs of minority in groups">Gender Weight:<span class="tooltip" title="Weight given to create pairs of minority in groups">?</span></label>
+        <input type="number" step="0.01" id="gender_weight" value="0.8" />
+        <label for="academic_weight" title="Proportion of motivation score taken from target grade">Academic Weight:<span class="tooltip" title="Proportion of motivation score taken from target grade">?</span></label>
+        <input type="number" step="0.01" id="academic_weight" value="0.5" />
+        <label for="teamwork_weight" title="Weight given to creating teams with equitable teamwork skills">Teamwork Weight:<span class="tooltip" title="Weight given to creating teams with equitable teamwork skills">?</span></label>
+        <input type="number" step="0.01" id="teamwork_weight" value="0.1"/>
+        <label for="whitelist_weight" title="Weighting given to prioritise whitelists">Whitelist Weight:<span class="tooltip" title="Weighting given to prioritise whitelists">?</span></label>
+        <input type="number" step="0.01" id="whitelist_weight" value="1" />
+        <label for="blacklist_weight" title="Weighting given to prioritise blacklist">Blacklist Weight:<span class="tooltip" title="Weighting given to prioritise blacklist">?</span></label>
+        <input type="number" step="0.01" id="blacklist_weight" value="2" />
+
+        <label for="whitelist_limit" title="Limit how many participant each participant can whitelist">Whitelist limit:<span class="tooltip" title="Limit how many participant each participant can whitelist">?</span></label>
+        <input type="number" step="1" id="whitelist_limit" value="2" />
+
+
+        <label for="blacklist_limit" title="Limit how many participant each participant can blacklist">blacklist limit:<span class="tooltip" title="Limit how many participant each participant can blacklist">?</span></label>
+        <input type="number" step="1" id="blacklist_limit" value="2" />
+
+        <div class="button-row">
+          <button type="button" id="rounding_toggle">Rounding number of groups: Down</button>
+        </div>
+        <label><input type="checkbox" id="normalise_skill" /> Normalise technical skill score</label>
+
+
+
+
+      </fieldset>
+
+
+
+
+
+
+
+    <!-- Solver Settings -->
+
+
+
+      <fieldset class="collapsible" id="solver_settings">
+        <legend>Solver Settings</legend>
+        <label>Algorithm:</label>
+        <select id="algorithm">
+          <option value="combined">Combined</option>
+          <option value="local search">Local Search</option>
+          <option value="genetic">Genetic</option>
+
+        </select>
+        <div id="local_params">
+          <label>Max Iterations:</label>
+          <input type="number" id="max_iterations" value="50000" max="100000" />
+        </div>
+        <div id="genetic_params" style="display:none;">
+          <label>Max Generations:</label>
+          <input type="number" id="max_generations" value="50" max="200" />
+          <label>Population Size:</label>
+          <input type="number" id="population_size" value="10" max="1000"/>
+      </div>
+    </fieldset>
+
+    <!-- Output Settings -->
+
+
+
+
+        <fieldset class="collapsible" id="output_settings">
+        <legend>Output Settings</legend>
+        <label><input type="checkbox" id="show_names" checked> Show Names</label>
+        <label><input type="checkbox" id="show_email" checked> Show Emails</label>
+        <label><input type="checkbox" id="show_gender"> Show Gender</label>
+        <label><input type="checkbox" id="show_ESL"> Show ESL</label>
+        <label><input type="checkbox" id="show_report" checked> Generate PDF Report</label>
+    </fieldset>
+
+    <div class="button-row">
+      <button type="button" id="allocate_btn">Start Allocation</button>
+      <button onclick="window.open('https://docs.google.com/forms/d/1zEIYqdWtZxNwOmfSCOxW1OSpcuPzKI1moURsTumkGpE/copy', '_blank')">Get Survey Form</button>
+    </div>
+
+    <!-- Results -->
+    <fieldset>
+      <legend>Console</legend>
+      <pre id="result_output">Upload a file and click "Start Allocation" to view results.</pre>
+    </fieldset>
+  </form>
+</div>
+  <!-- //asdas </div -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+  //Autofill
+  document.getElementById('participant_file').addEventListener('change', async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    const ext = file.name.split('.').pop().toLowerCase();
+
+    reader.onload = function (e) {
+      let numParticipants = 0;
+
+      if (ext === 'csv') {
+        const text = e.target.result;
+        const rows = text.split(/\r?\n/).filter(row => row.trim() !== '');
+        numParticipants = rows.length - 1; // assuming first row is header
+      } else if (ext === 'xlsx') {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {type: 'array'});
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet);
+        numParticipants = json.length;
+      }
+
+      // Set value
+      if (numParticipants > 0) {
+        document.getElementById('num_participants').value = numParticipants;
+      }
+    };
+
+    if (ext === 'csv') {
+      reader.readAsText(file);
+    } else if (ext === 'xlsx') {
+      reader.readAsArrayBuffer(file);
+    } else {
+      alert('Unsupported file type. Please upload a CSV or XLSX.');
+    }
+  });
+
+  // Dark mode toggle
+  const darkToggle = document.getElementById('dark_mode_toggle');
+  darkToggle.addEventListener('click', () => {
+    document.body.classList.toggle('dark-mode');
+    darkToggle.textContent = document.body.classList.contains('dark-mode') ? 'Light Mode' : 'Dark Mode';
+  });
+
+
+
+  // Rounding toggle
+  const roundingBtn = document.getElementById('rounding_toggle');
+  roundingBtn.addEventListener('click', () => {
+    roundingBtn.textContent = roundingBtn.textContent.includes('Down') ?
+            'Rounding number of groups: Up' :
+            'Rounding number of groups: Down';
+  });
+
+  //how to use window
+     const modal = document.getElementById("termsModal");
+
+    function openModal() {
+      modal.style.display = "block";
+    }
+
+    function closeModal() {
+      modal.style.display = "none";
+    }
+
+    // Close when clicking outside the modal content
+    window.onclick = function(event) {
+      if (event.target === modal) {
+        closeModal();
+      }
+    };
+
+
+  // Algorithm change
+  document.getElementById('algorithm').addEventListener('change', e => {
+    const value = e.target.value;
+
+    document.getElementById('local_params').style.display = (value === 'local search' || value === 'combined') ? 'block' : 'none';
+    document.getElementById('genetic_params').style.display = (value === 'genetic') ? 'block' : 'none';
+  });
+
+  // Toggle collapse sections// Toggle collapse sections - only one open at a time
+  document.querySelectorAll('.toggle-btn').forEach(btn => {
+    btn.classList.add('collapsed');
+    btn.addEventListener('click', () => {
+      const targetId = btn.getAttribute('data-target');
+      const section = document.getElementById(targetId);
+      const isExpanded = section.classList.contains('expanded');
+
+      // Collapse all
+      document.querySelectorAll('.collapsible').forEach(s => s.classList.remove('expanded'));
+      document.querySelectorAll('.toggle-btn').forEach(b => {
+        b.classList.remove('expanded');
+        b.classList.add('collapsed');
+      });
+
+      // Expand selected
+      if (!isExpanded) {
+        section.classList.add('expanded');
+        btn.classList.add('expanded');
+        btn.classList.remove('collapsed');
+      }
+    });
+  });
+
+
+  // Allocation handler
+  document.getElementById('allocate_btn').onclick = async () => {
+    // Collapse all expanded sections
+    document.querySelectorAll('.collapsible.expanded').forEach(section => section.classList.remove('expanded'));
+    document.querySelectorAll('.toggle-btn.expanded').forEach(btn => {
+      btn.classList.remove('expanded');
+      btn.classList.add('collapsed');
+    });
+
+    const fileInput = document.getElementById('participant_file');
+    const file = fileInput.files[0];
+    if (!file) {
+      alert('Please upload a CSV or XLSX file.');
+      return;
+    }
+
+    const numParticipants = Number(document.getElementById('num_participants').value);
+    const groupSize = Number(document.getElementById('group_size').value);
+    const numGroups = Math.floor(numParticipants / groupSize);
+    const resultOutput = document.getElementById('result_output');
+
+    // Loading animation
+    const generateMatrixText = () => {
+      const matrix = Array.from({length: numGroups}, () =>
+              Array.from({length: groupSize}, () =>
+                      String(Math.floor(Math.random() * numParticipants) + 1).padStart(numParticipants >= 100 ? 3 : 2, '0')
+              )
+      );
+      return `Solving...\n${matrix.map(row => row.join('\t')).join('\n')}`;
+    };
+    const loadingInterval = setInterval(() => {
+      resultOutput.textContent = generateMatrixText();
+    }, 200);
+
+    // Build form data
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const settings = {
+      num_participants: numParticipants,
+      group_size: groupSize,
+      algorithm: document.getElementById('algorithm').value,
+      motivation_weight: Number(document.getElementById('motivation_weight').value),
+      max_iterations: Number(document.getElementById('max_iterations').value),
+      max_generations: Number(document.getElementById('max_generations').value),
+      population_size: Number(document.getElementById('population_size').value),
+      skill_weight: Number(document.getElementById('skill_weight').value),
+      min_skill: Number(document.getElementById('min_skill').value),
+      ESL_weight: Number(document.getElementById('ESL_weight').value),
+      gender_weight: Number(document.getElementById('gender_weight').value),
+      academic_weight: Number(document.getElementById('academic_weight').value),
+      whitelist_weight: Number(document.getElementById('whitelist_weight').value),
+      blacklist_weight: Number(document.getElementById('blacklist_weight').value),
+      whitelist_limit: Number(document.getElementById('whitelist_limit').value),
+      blacklist_limit: Number(document.getElementById('blacklist_limit').value),
+      teamwork_weight: Number(document.getElementById('teamwork_weight').value),
+      show_names: document.getElementById('show_names').checked,
+      show_email: document.getElementById('show_email').checked,
+      show_gender: document.getElementById('show_gender').checked,
+      show_ESL: document.getElementById('show_ESL').checked,
+      show_report: document.getElementById('show_report').checked,
+      normalise_skill: document.getElementById('normalise_skill').checked
+    };
+    formData.append('settings', JSON.stringify(settings));
+
+    try {
+      const response = await fetch('/run_allocation', {
+        method: 'POST',
+        body: formData
+      });
+
+      clearInterval(loadingInterval);
+
+      const contentType = response.headers.get('content-type');
+
+      if (contentType.includes('application/json')) {
+        const result = await response.json();
+        resultOutput.textContent = JSON.stringify(result, null, 2);
+
+      } else if (contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
+        const blob = await response.blob();
+        const excelUrl = URL.createObjectURL(blob);
+        const excelLink = document.createElement('a');
+        excelLink.href = excelUrl;
+        excelLink.download = 'groups.xlsx';
+        document.body.appendChild(excelLink);
+        excelLink.click();
+        excelLink.remove();
+        URL.revokeObjectURL(excelUrl);
+
+        resultOutput.textContent = 'Excel file downloaded successfully.';
+
+        // Handle PDF download
+        if (settings.show_report) {
+          try {
+            const pdfResp = await fetch('/download_report');
+            if (!pdfResp.ok) throw new Error('PDF response failed');
+
+            const pdfBlob = await pdfResp.blob();
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            const pdfLink = document.createElement('a');
+            pdfLink.href = pdfUrl;
+            pdfLink.download = 'groups_report.pdf';
+            document.body.appendChild(pdfLink);
+            pdfLink.click();
+            pdfLink.remove();
+            URL.revokeObjectURL(pdfUrl);
+
+            resultOutput.textContent += '\nPDF report downloaded successfully.';
+          } catch (err) {
+            resultOutput.textContent += `\nError downloading PDF: ${err.message}`;
+          }
+        }
+      } else {
+        resultOutput.textContent = 'Unexpected response format.';
+      }
+    } catch (err) {
+      clearInterval(loadingInterval);
+      resultOutput.textContent = `Error during allocation: ${err.message}`;
+    }
+  };
+
+
+</script>
+
+
+</body>
+</html>

@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mines</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background: #1e1e2f;
+      color: #f0f0f0;
+    }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(5, 60px);
+  grid-gap: 10px;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.cell {
+  perspective: 600px;
+}
+
+.card {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  transform-style: preserve-3d;
+  transition: transform 0.5s;
+  cursor: pointer;
+}
+
+.card.flipped {
+  transform: rotateY(180deg);
+}
+
+.front, .back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  line-height: 60px;
+  text-align: center;
+  font-size: 24px;
+  border: 2px solid #444;
+  border-radius: 6px;
+  backface-visibility: hidden;
+}
+
+.front {
+  background: #333;
+  color: #fff;
+}
+
+.back {
+  transform: rotateY(180deg);
+}
+
+.back.safe {
+  background: #2e7d32;
+  color: #fff;
+}
+
+.back.mine {
+  background: #c62828;
+  color: #fff;
+}
+
+    .cell.revealed {
+      background: #2e7d32;
+    }
+    .cell.mine {
+      background: #c62828;
+    }
+    input, button {
+      margin: 5px;
+      padding: 5px 10px;
+      font-size: 16px;
+    }
+    .controls {
+      margin-bottom: 20px;
+    }
+
+    .button-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 5px 0;
+  justify-content: center;
+}
+
+.button-bar button {
+  padding: 5px 10px;
+  font-size: 14px;
+  background: #222;
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.button-bar button.active {
+  background: #555;
+  border-color: #888;
+}
+
+
+
+.top-right-buttons button {
+    position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;  /* stack vertically */
+  align-items: flex-end;   /* right align */
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  background-color: #2e7d32;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.top-right-buttons button:hover {
+  background-color: #388e3c;
+}
+
+
+.button-bar input {
+  width: 80px;
+  padding: 5px;
+  font-size: 14px;
+  background: #111;
+  color: #fff;
+  border: 1px solid #444;
+  border-radius: 4px;
+}
+
+  .active {
+    background-color: #4CAF50; /* Green background */
+    color: white;
+    font-weight: bold;
+    border: 2px solid #2e7d32;
+  }
+
+/* Base style */
+#betOptions button,
+#mineOptions button {
+  margin: 5px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  background-color: #2e7d32; /* dark green */
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+/* Hover effect (optional) */
+#betOptions button:hover,
+#mineOptions button:hover {
+  background-color: #388e3c; /* slightly lighter green */
+}
+
+/* Selected button style */
+#betOptions button.active,
+#mineOptions button.active {
+  background-color: #a5d6a7; /* light green */
+  color: black;
+}
+
+
+
+  </style>
+</head>
+<body>
+
+<div class="top-right-buttons">
+  <button onclick="window.location.href='dice'">Dice</button>
+</div>
+
+
+<h1>Mines</h1>
+<p>Balance: $<span id="balance">1000</span></p>
+
+<div class="controls">
+  <div class="control-group">
+    <label>Bet:</label>
+    <div id="betOptions">
+  <button onclick="setBet(5, event)">5</button>
+  <button onclick="setBet(10, event)">10</button>
+  <button onclick="setBet(50, event)">50</button>
+  <button onclick="setBet(100, event)">100</button>
+  <button onclick="setBet('all', event)">All In</button>
+  <button onclick="setBet('custom', event)">Custom</button>
+  <input id="customBet" style="display:none;" placeholder="Enter bet" />
+</div>
+  </div>
+
+  <div class="control-group">
+    <label>Mines:</label>
+<div id="mineOptions">
+  <button onclick="setMines(1, event)">1</button>
+  <button onclick="setMines(3, event)">3</button>
+  <button onclick="setMines(5, event)">5</button>
+  <button onclick="setMines(10, event)">10</button>
+  <button onclick="setMines(24, event)">24</button>
+  <button onclick="setMines('custom', event)">Custom</button>
+  <input id="customMines" style="display:none;" placeholder="Enter mines" />
+</div>
+  </div>
+
+<button id="gameActionBtn" onclick="handleGameAction()">Start Game</button>
+
+
+</div>
+
+<div class="grid" id="grid"></div>
+
+<p id="message"></p>
+
+<button id="depositBtn" style="padding:10px 20px; font-size:16px; cursor:pointer;">
+  Deposit
+</button>
+
+
+
+<script>
+let balance = 1000; // default
+
+const savedBalance = localStorage.getItem('balance');
+if (savedBalance !== null && !isNaN(parseFloat(savedBalance))) {
+  balance = parseFloat(savedBalance);
+}
+
+
+
+
+
+    document.getElementById('depositBtn').addEventListener('click', function() {
+    window.location.href = 'https://www.gamcare.org.uk/';
+  });
+
+
+  let selectedBet = 10;
+  let selectedMines = 5;
+  const gridSize = 5;
+  const totalCells = gridSize * gridSize;
+
+
+function updateBalance() {
+  document.getElementById('balance').textContent = balance.toFixed(2);
+  localStorage.setItem('balance', balance.toFixed(2));  // Save balance here!
+}
+
+
+
+updateBalance()
+
+  let bet = 0;
+  let mineCount = 5;
+  let minePositions = new Set();
+  let revealed = new Set();
+  let gameStarted = false;
+
+
+
+  function createGrid() {
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    for (let i = 0; i < totalCells; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.index = i;
+
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.onclick = () => handleCellClick(i);
+
+      const front = document.createElement('div');
+      front.className = 'front';
+      front.textContent = '';
+
+      const back = document.createElement('div');
+      back.className = 'back';
+      back.textContent = '';
+
+      card.appendChild(front);
+      card.appendChild(back);
+      cell.appendChild(card);
+      grid.appendChild(cell);
+    }
+  }
+
+  function handleCellClick(index) {
+    if (!gameStarted || revealed.has(index)) return;
+
+    const cell = document.querySelector(`.cell[data-index='${index}']`);
+    const card = cell.querySelector('.card');
+    const back = card.querySelector('.back');
+
+    card.classList.add('flipped');
+
+    setTimeout(() => {
+      if (minePositions.has(index)) {
+        back.classList.add('mine');
+        back.textContent = "💣";
+        endGame(false);
+      } else {
+        revealed.add(index);
+        back.classList.add('safe');
+        back.textContent = "✓";
+        updateWinnings();
+      }
+    }, 250);
+  }
+function checkPasswordAndReward() {
+  const password = "UCL25";  // your specific password
+  const customMinesInput = document.getElementById('customMines').value.trim();
+
+  if (customMinesInput === password) {
+    alert("Password accepted! You got a bonus $10,000.");
+    balance += 10000;  // add money to balance
+    updateBalance();
+    document.getElementById('customMines').value = ""; // clear input
+  }
+}
+function setBet(value, e) {
+  const buttons = document.querySelectorAll("#betOptions button");
+  buttons.forEach(btn => btn.classList.remove("active"));
+  document.getElementById("customBet").style.display = "none";
+
+  if (value === 'all') {
+    selectedBet = Math.floor(balance); // round down to whole dollars
+    if (selectedBet < 1) selectedBet = 1; // minimum bet fallback
+  } else if (value === 'custom') {
+    document.getElementById("customBet").style.display = "inline-block";
+    selectedBet = null;
+  } else {
+    selectedBet = value;
+  }
+
+  if (e) e.target.classList.add("active");
+
+  // Optional: Update the customBet input value so user sees the all in amount
+  if (value === 'all') {
+    const customBetInput = document.getElementById("customBet");
+    customBetInput.value = selectedBet;
+  }
+}
+
+  function setMines(value, event) {
+    const buttons = document.querySelectorAll("#mineOptions button");
+    buttons.forEach(btn => btn.classList.remove("active"));
+    document.getElementById("customMines").style.display = "none";
+
+    if (value === 'custom') {
+      document.getElementById("customMines").style.display = "inline-block";
+      selectedMines = null;
+    } else {
+      selectedMines = value;
+      if (event) event.target.classList.add("active");
+    }
+  }
+
+  function startGame() {
+    checkPasswordAndReward();
+    if (gameStarted) {
+      alert("Finish the current game or cash out first.");
+      return;
+    }
+
+    const customBetInput = parseFloat(document.getElementById('customBet').value || '0');
+    const customMineInput = parseInt(document.getElementById('customMines').value || '0');
+
+    bet = selectedBet ?? customBetInput;
+    mineCount = selectedMines ?? customMineInput;
+
+    if (!bet || bet <= 0 || bet > balance) {
+      alert("Invalid bet amount.");
+      return;
+    }
+
+    if (!mineCount || mineCount < 1 || mineCount >= totalCells) {
+      alert("Invalid number of mines.");
+      return;
+    }
+
+    balance -= bet;
+    updateBalance();
+    revealed.clear();
+    minePositions = generateMines(mineCount);
+    createGrid();
+    gameStarted = true;
+    document.getElementById('message').textContent = "Game started! Click a tile.";
+  }
+
+  function updateWinnings() {
+  if (!gameStarted) return;
+
+  const revealedTiles = revealed.size;
+  const houseEdge = 0.97;
+
+  let cumulativeProbability = 1.0;
+  let safeLeft = totalCells - mineCount;
+  let tilesLeft = totalCells;
+
+  for (let i = 0; i < revealedTiles; i++) {
+    cumulativeProbability *= safeLeft / tilesLeft;
+    safeLeft--;
+    tilesLeft--;
+  }
+
+  let currentMultiplier = cumulativeProbability > 0 ? (1 / cumulativeProbability) * houseEdge : 1;
+  const currentWinnings = (bet * currentMultiplier);
+
+  // --- Predict next step (if 1 more safe tile revealed) ---
+  let nextSafeLeft = safeLeft - 1;
+  let nextTilesLeft = tilesLeft - 1;
+  let nextProbability = cumulativeProbability * (nextSafeLeft / nextTilesLeft);
+  let nextMultiplier = nextProbability > 0 ? (1 / nextProbability) * houseEdge : 1;
+  const nextWinnings = bet * nextMultiplier;
+
+  document.getElementById('message').textContent =
+    `Revealed: ${revealedTiles} | Cashout: $${currentWinnings.toFixed(2)} | If next is safe: $${nextWinnings.toFixed(2)}`;
+}
+
+
+  function cashOut() {
+    if (!gameStarted) return;
+
+    const revealedTiles = revealed.size;
+    const houseEdge = 0.97;
+
+    let cumulativeProbability = 1.0;
+    let safeLeft = totalCells - mineCount;
+    let tilesLeft = totalCells;
+
+for (let i = 0; i < revealedTiles; i++) {
+  cumulativeProbability *= safeLeft / tilesLeft;
+  safeLeft--;
+  tilesLeft--;
+}
+
+gameStarted = false;
+document.getElementById('gameActionBtn').textContent = 'Start Game';
+
+
+
+    let multiplier = cumulativeProbability > 0 ? (1 / cumulativeProbability) * houseEdge : 1;
+    const winnings = bet * multiplier;
+
+    balance += winnings;
+    updateBalance();
+    document.getElementById('message').textContent = `You cashed out $${winnings.toFixed(2)}!`;
+    revealAll();
+    gameStarted = false;
+  }
+
+function endGame(won) {
+  if (!won) {
+    document.getElementById('message').textContent = "You hit a mine! 💥";
+  }
+  revealAll();
+  gameStarted = false;
+  document.getElementById('gameActionBtn').textContent = 'Start Game';
+}
+
+  function revealAll() {
+    for (let i = 0; i < totalCells; i++) {
+      const cell = document.querySelector(`.cell[data-index='${i}']`);
+      const card = cell.querySelector('.card');
+      const back = card.querySelector('.back');
+
+      card.classList.add('flipped');
+
+      if (minePositions.has(i)) {
+        back.classList.add('mine');
+        back.textContent = "💣";
+      } else {
+        back.classList.add('safe');
+        back.textContent = "✓";
+      }
+    }
+  }
+
+  function generateMines(count) {
+    const positions = new Set();
+    while (positions.size < count) {
+      positions.add(Math.floor(Math.random() * totalCells));
+    }
+    return positions;
+  }
+
+  function handleGameAction() {
+  if (!gameStarted) {
+    startGame();
+    document.getElementById('gameActionBtn').textContent = 'Cash Out';
+  } else {
+    cashOut();
+    document.getElementById('gameActionBtn').textContent = 'Start Game';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  updateBalance();
+  createGrid();
+});
+
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+Flask
+pandas
+matplotlib
+reportlab
+numpy
+pylatex
+openpyxl
+Pillow
+gunicorn
