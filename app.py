@@ -30,17 +30,15 @@ import time
 from pylatex import Document, Section, Math
 import math
 import threading
-import tkinter as tk
-from tkinter import StringVar
-from tkinter import messagebox
+
+
 from openpyxl import load_workbook
-from tkinter import ttk, filedialog, messagebox
+
 import csv
 import copy
 from copy import deepcopy
 import pandas as pd
-from PIL import Image as PILImage
-from PIL import ImageTk
+
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
@@ -54,86 +52,6 @@ participants=[]
 #Matrix solver
 
 # matrix solver
-
-class MatrixApp:
-    def __init__(self, parent, group_size, num_participants):
-        self.group_size = group_size
-        self.num_participants = num_participants
-        self.rows = num_participants // group_size
-        self.cols = group_size
-        self.window = tk.Toplevel(parent)
-        self.window.overrideredirect(True)  # Remove native title bar
-        self.window.configure(bg='black')
-
-        # Custom black title bar
-        self.title_bar = tk.Frame(self.window, bg='black', relief='raised', bd=0, height=30)
-        self.title_bar.pack(fill='x', side='top')
-
-        self.title_label = tk.Label(
-            self.title_bar, text="Solving....",
-            fg='lime', bg='black',
-            font=("Courier", 12, "bold")
-        )
-        self.title_label.pack(side='left', padx=10)
-
-        self.close_button = tk.Button(
-            self.title_bar, text='✕', command=self.close,
-            fg='lime', bg='black', bd=0,
-            font=("Arial", 12),
-            activebackground='red', activeforeground='white'
-        )
-        self.close_button.pack(side='right', padx=10)
-
-        # Bind dragging events to title_bar
-        self.title_bar.bind('<Button-1>', self.start_move)
-        self.title_bar.bind('<B1-Motion>', self.move_window)
-        self.title_label.bind('<Button-1>', self.start_move)
-        self.title_label.bind('<B1-Motion>', self.move_window)
-
-        # Matrix display label below title bar
-        self.matrix_label = tk.Label(
-            self.window,
-            text="",
-            font=("Courier New", 14),
-            justify='left',
-            anchor='nw',
-            fg='lime',
-            bg='black',
-            height=self.rows       # One line per row
-        )
-        max_digits = len(str(self.num_participants))
-        char_width = max_digits + 1  # digits + space
-        self.matrix_label.config(width=self.cols * char_width)
-
-        self.matrix_label.pack(padx=10, pady=10)
-
-        self.running = True
-        self.update_matrix()
-
-    def update_matrix(self):
-        if not self.running:
-            return
-
-        matrix_str = ""
-        for _ in range(self.rows):
-            digit_width = len(str(self.num_participants))  # e.g., 3 for 100+
-            row = [f"{random.randint(0, self.num_participants):0{digit_width}d}" for _ in range(self.cols)]
-            matrix_str += " ".join(row) + "\n"
-        self.matrix_label.config(text=matrix_str)
-        self.window.after(UPDATE_INTERVAL, self.update_matrix)
-
-    def start_move(self, event):
-        self.x = event.x
-        self.y = event.y
-
-    def move_window(self, event):
-        self.window.geometry(f'+{event.x_root - self.x}+{event.y_root - self.y}')
-
-    def close(self):
-        self.running = False
-        if self.window.winfo_exists():  # Check if window still exists
-            self.window.destroy()
-
 
 # for rendering properly and DIP aware in monitor
 import ctypes
