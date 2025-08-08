@@ -1,6 +1,6 @@
 #V0.11
 from group_logic import create_groups  
-from flask import Flask, request, render_template, jsonify, send_file
+from flask import Flask, request, render_template, jsonify, send_file, send_from_directory
 import pandas as pd
 import logging
 import uuid
@@ -1843,7 +1843,10 @@ def index():
 @app.route('/mines')
 def mines():
     return render_template('mines.html')
-
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
 @app.route('/dice')
 def dice():
     return render_template('dice.html')
