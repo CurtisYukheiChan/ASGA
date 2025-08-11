@@ -1,10 +1,11 @@
 #V0.11
 from group_logic import create_groups  
-from flask import Flask, request, render_template, jsonify, send_file, send_from_directory
+from flask import Flask, request, render_template, jsonify, send_file, send_from_directory, session
 import pandas as pd
 import logging
 import uuid
 import statistics
+from queue import Queue
 import traceback
 import io
 from collections import Counter, defaultdict
@@ -29,7 +30,7 @@ import numpy as np
 import time
 from pylatex import Document, Section, Math
 import math
-import threading
+from threading import Thread
 
 
 from openpyxl import load_workbook
@@ -43,11 +44,16 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+task_queue = Queue()
+results={}
 app.config['UPLOAD_FOLDER'] = 'uploads'
 # VARIABLES TO STORE
 groups = None
 UPDATE_INTERVAL = 50  # milliseconds
 participants=[]
+temp_storage = {}  # server-side store
+app.secret_key = os.urandom(24)
+
 
 #Matrix solver
 
@@ -426,7 +432,6 @@ def start_allocation(participants,
             blacklist_weight,
             motivation_weight,
             teamwork_weight         ):
-    global groups
     global elapsed_time
     min_skill_enforcement=min_skill
 
@@ -855,9 +860,9 @@ class NumberedCanvas(canvas.Canvas):
         self.drawRightString(7.5 * inch, 0.75 * inch,
                              f"Page {self._pageNumber} of {page_count}")
 
-def generate_reportlab_pdf(groups, num_participants, group_size,filename, elapsed_time):
+def generate_reportlab_pdf(groups, num_participants, group_size,filename, elapsed_time, skill_A_name, skill_B_name, skill_C_name, selected_algorithm):
     #variables
-    global skill_A_names, skill_B_names, skill_C_names, selected_algorithm
+
 
     motivation_avgs = []
     motivation_stds = []
@@ -1012,9 +1017,8 @@ def generate_reportlab_pdf(groups, num_participants, group_size,filename, elapse
     plot_folder = 'temp_plots'
     os.makedirs(plot_folder, exist_ok=True)
 
-    plot_skills_bar_chart(groups,filename_max=os.path.join(plot_folder, 'max_skills.png'),
-                          filename_avg=os.path.join(plot_folder, 'avg_skills.png')
-    )
+    plot_skills_bar_chart(groups=groups,filename_max=os.path.join(plot_folder, 'max_skills.png'),
+                          filename_avg=os.path.join(plot_folder, 'avg_skills.png'), skill_A_name=skill_A_name, skill_B_name=skill_B_name, skill_C_name=skill_C_name)
 
     # Add graphs to PDF :
 
@@ -1235,10 +1239,7 @@ def generate_reportlab_pdf(groups, num_participants, group_size,filename, elapse
 
 
 
-def plot_skills_bar_chart(groups, filename_max, filename_avg):
-    global skill_A_name
-    global skill_B_name
-    global skill_C_name
+def plot_skills_bar_chart(groups, filename_max, filename_avg, skill_A_name, skill_B_name, skill_C_name):
     groups_list = list(range(1, len(groups) + 1))
 
     max_skills_A, max_skills_B, max_skills_C = [], [], []
@@ -1356,13 +1357,6 @@ def TW_chart(groups):
 
 @app.route('/run_allocation', methods=['POST'])
 def run_allocation():
-    global num_participants
-    global group_size
-    global groups
-    global skill_A_name
-    global skill_B_name
-    global skill_C_name
-    global selected_algorithm
     print('Form data:', request.form)
     print('Files:', request.files)
     try:
@@ -1664,6 +1658,8 @@ def run_allocation():
         df['motivation'] = ((1 - academic_weight) * df['Personality Average'] +
                             academic_weight * score_col)
 
+        df['motivation']=(5/df['motivation'].max())*df['motivation']
+
 
         print("Before normalization:")
         print(df[[skill_A, skill_B, skill_C]].head())
@@ -1766,6 +1762,17 @@ def run_allocation():
             )
             print("start_allocation returned:", type(excel_buffer))
             print("Type of groups:", type(groups))
+            data_id = str(uuid.uuid4())
+            session['data_id'] = data_id
+            temp_storage[data_id] = {
+                'groups': groups,
+                'group_size': group_size,
+                'skill_A_name': skill_A_name,
+                'skill_B_name':skill_B_name,
+                'skill_C_name': skill_C_name,
+                'selected_algorithm':selected_algorithm
+            }
+
 
         except Exception as e:
             print("Error in start_allocation:", str(e))
@@ -1822,8 +1829,23 @@ import io
 @app.route('/download_report')
 def download_report():
     global elapsed_time
+    data_id = session.get('data_id')
+    data = temp_storage.get(data_id)
+    if not data:
+        return "No data found", 400
+
+    groups = data['groups']
+    group_size = data['group_size']
+    skill_A_name= data['skill_A_name']
+    skill_B_name=data['skill_B_name']
+    skill_C_name=data['skill_C_name']
+    selected_algorithm=data['selected_algorithm']
+
+    num_participants=max(p["id"] for group in groups for p in group)
+
+
     try:
-        pdf_buffer = generate_reportlab_pdf(groups, num_participants, group_size, filename=None,elapsed_time=elapsed_time)
+        pdf_buffer = generate_reportlab_pdf(groups, num_participants, group_size, filename=None,elapsed_time=elapsed_time, skill_A_name=skill_A_name, skill_B_name=skill_B_name, skill_C_name=skill_C_name, selected_algorithm=selected_algorithm)
         print("pdf_buffer type:", type(pdf_buffer))
         print("pdf_buffer:", pdf_buffer)
         if not hasattr(pdf_buffer, 'seek'):
