@@ -132,6 +132,7 @@
       content: '▼ ';}
 
 .collapsible {
+  display: none;
   position: absolute;
   top: 50px;
   left: 0;
@@ -147,6 +148,7 @@
 }
 
 .collapsible.expanded {
+  display:block;
   opacity: 1;
   pointer-events: auto;
   z-index: 1;
@@ -356,6 +358,7 @@ fieldset.collapsible.expanded {
       <h2>Student forming their own groups</h2>
       By default the algorithm allows the participants to name 2 other participants to be preferibily in their group, and two other preferibily excluded from their group.
       This can be adjusted in advanced settings using whitelist and blacklist limits to allow participants to have more prefered groupmates or remove this function entirely by setting both limits to 0.
+      Please increase whitelist weighting if students being in a group of their choosing is a priority as the defult value takes whitelist as a suggestion but also balances other factors.
       <h2>Contacts</h2>
       This software is created by Curtis Chan, if there are any inquaries or technical problems please email curtischanyukhei.hr@gmail.com, we aim to respond in 5 business days.
 
@@ -388,9 +391,9 @@ fieldset.collapsible.expanded {
     <!-- Advanced Settings -->
     <div class="settings-container">
 <div class="toggle-button-row">
-  <button type="button" class="toggle-btn" data-target="advanced_settings">▶ Advanced Settings</button>
-  <button type="button" class="toggle-btn" data-target="solver_settings">▶ Solver Settings</button>
-  <button type="button" class="toggle-btn" data-target="output_settings">▶ Output Settings</button>
+  <button type="button" class="toggle-btn" data-target="advanced_settings"> Advanced Settings</button>
+  <button type="button" class="toggle-btn" data-target="solver_settings"> Solver Settings</button>
+  <button type="button" class="toggle-btn" data-target="output_settings"> Output Settings</button>
   </div>
 
 <div class="collapsible-panel">
@@ -400,20 +403,20 @@ fieldset.collapsible.expanded {
         <label for="skill_weight">Skill Weight: <span class="tooltip" title="Importance of balancing technical skills when forming groups (0-1)">?</span></label>
         <input type="number" step="0.01" id="skill_weight" value="0.9" />
         <label for="motivation_weight" title="Weight given to participant motivation">Motivation weight:<span class="tooltip" title="Weight given to participant motivation">?</span></label>
-        <input type="number" step="0.01" id="motivation_weight" value="3" />
+        <input type="number" step="0.01" id="motivation_weight" value="7" />
         <label for="min_skill" title="Minimum technical skill level of any skill in any group">Skill Floor:<span class="tooltip" title="Minimum technical skill level of any skill in any group (0-1)">?</span></label><input type="number" step="0.01" id="min_skill" value="1" />
         <label for="ESL_weight" title="Weight given to balancing ESL (English as Second Language) students">ESL Weight:<span class="tooltip" title="Weight given to balancing ESL (English as Second Language) students">?</span></label>
-        <input type="number" step="0.01" id="ESL_weight" value="0.8" />
+        <input type="number" step="0.01" id="ESL_weight" value="1" />
         <label for="gender_weight" title="Weight given to create pairs of minority in groups">Gender Weight:<span class="tooltip" title="Weight given to create pairs of minority in groups">?</span></label>
-        <input type="number" step="0.01" id="gender_weight" value="0.8" />
-        <label for="academic_weight" title="Proportion of motivation score taken from target grade">Academic Weight:<span class="tooltip" title="Proportion of motivation score taken from target grade">?</span></label>
+        <input type="number" step="0.01" id="gender_weight" value="1" />
+        <label for="academic_weight" title="Proportion of motivation score taken from target grade (0-1)">Academic Weight:<span class="tooltip" title="Proportion of motivation score taken from target grade (0-1)">?</span></label>
         <input type="number" step="0.01" id="academic_weight" value="0.5" />
         <label for="teamwork_weight" title="Weight given to creating teams with equitable teamwork skills">Teamwork Weight:<span class="tooltip" title="Weight given to creating teams with equitable teamwork skills">?</span></label>
-        <input type="number" step="0.01" id="teamwork_weight" value="0.1"/>
+        <input type="number" step="0.01" id="teamwork_weight" value="1"/>
         <label for="whitelist_weight" title="Weighting given to prioritise whitelists">Whitelist Weight:<span class="tooltip" title="Weighting given to prioritise whitelists">?</span></label>
-        <input type="number" step="0.01" id="whitelist_weight" value="1" />
+        <input type="number" step="0.01" id="whitelist_weight" value="3" />
         <label for="blacklist_weight" title="Weighting given to prioritise blacklist">Blacklist Weight:<span class="tooltip" title="Weighting given to prioritise blacklist">?</span></label>
-        <input type="number" step="0.01" id="blacklist_weight" value="2" />
+        <input type="number" step="0.01" id="blacklist_weight" value="5" />
 
         <label for="whitelist_limit" title="Limit how many participant each participant can whitelist">Whitelist limit:<span class="tooltip" title="Limit how many participant each participant can whitelist">?</span></label>
         <input type="number" step="1" id="whitelist_limit" value="2" />
@@ -497,6 +500,18 @@ fieldset.collapsible.expanded {
   document.getElementById('participant_file').addEventListener('change', async (event) => {
     const file = event.target.files[0];
     if (!file) return;
+
+
+     // 500 KB limit
+    const maxSize = 500 * 1024; // bytes
+    if (file.size > maxSize) {
+        alert('File is too large! Please upload a file smaller than 500 KB.');
+        event.target.value = ''; // reset file input
+        return;
+    }
+
+
+
 
     const reader = new FileReader();
     const ext = file.name.split('.').pop().toLowerCase();

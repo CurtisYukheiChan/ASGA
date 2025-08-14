@@ -77,7 +77,7 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 #loading variables, CSV file
 
 #genetic algo
-def compute_fitness(groups, skill_cap, min_max_skill_C_prior, min_skill_enforcement, ESL_weight, gender_weight,whitelist_weight,blacklist_weight, motivation_weight, teamwork_weight):
+def compute_fitness(groups, skill_cap, min_max_skill_A_prior,min_max_skill_B_prior,min_max_skill_C_prior, min_skill_enforcement, ESL_weight, gender_weight,whitelist_weight,blacklist_weight, motivation_weight, teamwork_weight,basis_motivation,basis_IE,basis_TWS):
     motivation_std = np.mean([
         np.std([p['motivation'] for p in group])
         for group in groups
@@ -128,21 +128,38 @@ def compute_fitness(groups, skill_cap, min_max_skill_C_prior, min_skill_enforcem
         if skill_sum < skill_cap:
             skill_penalty += (skill_cap - skill_sum) * 1
 
-        for s in 'ABC':
-            if max_skills[s] < min_skill_enforcement * min_max_skill_C_prior:
-                skill_penalty += 1
+
+        if max_skills['A'] < min_skill_enforcement * min_max_skill_A_prior:
+            skill_penalty += 1
+
+        if max_skills['B'] < min_skill_enforcement * min_max_skill_B_prior:
+            skill_penalty += 1
+
+        if max_skills['C'] < min_skill_enforcement * min_max_skill_C_prior:
+            skill_penalty += 1
+
+        if math.isnan(skill_penalty):
+            skill_penalty = 0
+
 
         #  whitelist and blacklist scoring
         total_whitelist, total_blacklist = count_all_matches(group)
 
         # whitelist matches
         whitelist_bonus += total_whitelist * whitelist_weight
+        if math.isnan(whitelist_bonus):
+            whitelist_bonus = 0
 
         #  blacklist matches
         blacklist_penalty += total_blacklist * blacklist_weight
 
+        if math.isnan(blacklist_penalty):
+            blacklist_penalty = 0
+
+
+
     # Fitness aims to maximize motivation and IE_std but minimize penalties
-    return -(motivation_std * motivation_weight + skill_penalty + diversity_penalty_sum + blacklist_penalty - IE_std - whitelist_bonus + teamwork_std*teamwork_weight )
+    return -((motivation_std * motivation_weight)/basis_motivation + skill_penalty*20 + diversity_penalty_sum + blacklist_penalty - IE_std/basis_IE - whitelist_bonus + (teamwork_std*teamwork_weight)/basis_TWS )
 
 
 def generate_initial_population(participants, num_groups, group_size, population_size):
@@ -186,14 +203,14 @@ def mutate(groups, mutation_rate=0.05):
     return groups
 
 
-def genetic_algorithm(participants, num_groups, group_size, skill_cap, min_max_skill_C_prior, min_skill_enforcement,
-                      population_size, max_generations, groups_sorted_C, ESL_weight, gender_weight,whitelist_weight,blacklist_weight, motivation_weight, teamwork_weight):
+def genetic_algorithm(participants, num_groups, group_size, skill_cap, min_max_skill_A_prior,min_max_skill_B_prior,min_max_skill_C_prior, min_skill_enforcement,
+                      population_size, max_generations, groups_sorted_C, ESL_weight, gender_weight,whitelist_weight,blacklist_weight, motivation_weight, teamwork_weight,basis_motivation,basis_IE,basis_TWS):
     population = [copy.deepcopy(groups_sorted_C) for _ in range(population_size)]
     print(f"motivation weight: {motivation_weight}")
 
     for generation in range(max_generations):
         fitnesses = [
-            compute_fitness(groups, skill_cap, min_max_skill_C_prior, min_skill_enforcement, ESL_weight, gender_weight,whitelist_weight,blacklist_weight,motivation_weight,teamwork_weight)
+            compute_fitness(groups, skill_cap, min_max_skill_A_prior,min_max_skill_B_prior,min_max_skill_C_prior, min_skill_enforcement, ESL_weight, gender_weight,whitelist_weight,blacklist_weight,motivation_weight,teamwork_weight,basis_motivation,basis_IE,basis_TWS)
             for groups in population]
 
         new_population = []
@@ -576,6 +593,36 @@ def start_allocation(participants,
         motivation_std_records = []
         #print("Check point 3")
 
+        average_motivation_std_basis=[]
+        for group in groups:
+            if len(group) > 2:
+                group_motivation = [p['motivation'] for p in group]
+                average_motivation_std_basis.append(np.std(group_motivation))
+            else:
+                average_motivation_std_basis.append(1)
+        basis_motivation=np.mean(average_motivation_std_basis)
+
+
+        basis_TWS = np.std([
+            np.mean([p['teamwork'] for p in group])
+            for group in groups
+            if len(group) >= 2
+        ]) if any(len(group) >= 2 for group in groups) else 1
+
+        basis_IE = np.mean([
+            np.std([p['IE'] for p in group])
+            for group in groups
+            if len(group) >= 2
+        ]) if any(len(group) >= 2 for group in groups) else 1
+
+
+        if math.isnan(basis_motivation) or basis_motivation == 0:
+            basis_motivation=1
+        if math.isnan(basis_TWS) or basis_TWS == 0:
+            basis_TWS=1
+        if math.isnan(basis_IE) or basis_IE == 0:
+            basis_IE=1
+
         if selected_algorithm in ("local search", "combined"):
             #print("Check point 4")
 
@@ -601,30 +648,31 @@ def start_allocation(participants,
 
 
                 if selected_algorithm == "combined":
-                    original_g1 = copy.deepcopy(groups[g1])
-                    original_g2 = copy.deepcopy(groups[g2])
-
-                    fitness_before1 = compute_fitness([ original_g1], skill_cap, min_max_skill_C_prior, min_skill_enforcement,
+                    #print("checkpoint 6")
+                    original_g1 = groups[g1][:]
+                    original_g2 = groups[g2][:]
+                    fitness_before1 = compute_fitness([original_g1], skill_cap,min_max_skill_A_prior,min_max_skill_B_prior, min_max_skill_C_prior, min_skill_enforcement,
                                                      ESL_weight, gender_weight, whitelist_weight, blacklist_weight,
-                                                     motivation_weight,teamwork_weight)
-                    fitness_before2 = compute_fitness([ original_g1], skill_cap, min_max_skill_C_prior, min_skill_enforcement,
+                                                     motivation_weight,teamwork_weight,basis_motivation,basis_IE,basis_TWS)
+                    fitness_before2 = compute_fitness([original_g2], skill_cap, min_max_skill_A_prior,min_max_skill_B_prior ,min_max_skill_C_prior, min_skill_enforcement,
                                                      ESL_weight, gender_weight, whitelist_weight, blacklist_weight,
-                                                     motivation_weight,teamwork_weight)
+                                                     motivation_weight,teamwork_weight,basis_motivation,basis_IE,basis_TWS)
 
 
                 # Swap participants
                 groups[g1][i1], groups[g2][i2] = groups[g2][i2], groups[g1][i1]
 
                 if selected_algorithm == "combined":
-                    original_g1 = copy.deepcopy(groups[g1])
-                    original_g2 = copy.deepcopy(groups[g2])
+                    #print("checkpoint 7")
+                    original_g1 = groups[g1][:]
+                    original_g2 = groups[g2][:]
 
-                    fitness_after1 = compute_fitness([original_g1], skill_cap, min_max_skill_C_prior, min_skill_enforcement,
+                    fitness_after1 = compute_fitness([original_g1], skill_cap, min_max_skill_A_prior,min_max_skill_B_prior,min_max_skill_C_prior, min_skill_enforcement,
                                                     ESL_weight, gender_weight, whitelist_weight, blacklist_weight,
-                                                    motivation_weight,teamwork_weight)
-                    fitness_after2 = compute_fitness([original_g2], skill_cap, min_max_skill_C_prior, min_skill_enforcement,
+                                                    motivation_weight,teamwork_weight,basis_motivation,basis_IE,basis_TWS)
+                    fitness_after2 = compute_fitness([original_g2], skill_cap,min_max_skill_A_prior,min_max_skill_B_prior, min_max_skill_C_prior, min_skill_enforcement,
                                                     ESL_weight, gender_weight, whitelist_weight, blacklist_weight,
-                                                    motivation_weight,teamwork_weight)
+                                                    motivation_weight,teamwork_weight,basis_motivation,basis_IE,basis_TWS)
                     swap_accepted = fitness_after1 > fitness_before1 and fitness_after2 > fitness_before2
 
                 # Evaluate new grouping
@@ -657,11 +705,11 @@ def start_allocation(participants,
                                 after_blacklist_total1 + after_blacklist_total2 <= before_blacklist_total1 + before_blacklist_total2 and
                                 motivation_std_before > motivation_std_after and
                                 after_teamwork_std < before_teamwork_std and
-                                min_skill_enforcement * min_max_skill_C_prior <= max(p['skill_A'] for p in groups[g2]) and
-                                min_skill_enforcement * min_max_skill_C_prior <= max(p['skill_B'] for p in groups[g2]) and
+                                min_skill_enforcement * min_max_skill_A_prior <= max(p['skill_A'] for p in groups[g2]) and
+                                min_skill_enforcement * min_max_skill_B_prior <= max(p['skill_B'] for p in groups[g2]) and
                                 min_skill_enforcement * min_max_skill_C_prior <= max(p['skill_C'] for p in groups[g2]) and
-                                min_skill_enforcement * min_max_skill_C_prior <= max(p['skill_A'] for p in groups[g1]) and
-                                min_skill_enforcement * min_max_skill_C_prior <= max(p['skill_B'] for p in groups[g1]) and
+                                min_skill_enforcement * min_max_skill_A_prior <= max(p['skill_A'] for p in groups[g1]) and
+                                min_skill_enforcement * min_max_skill_B_prior <= max(p['skill_B'] for p in groups[g1]) and
                                 min_skill_enforcement * min_max_skill_C_prior <= max(p['skill_C'] for p in groups[g1]) and
                                 diversity_penalty_after <= diversity_penalty_before)
                     else:
@@ -671,11 +719,11 @@ def start_allocation(participants,
                                 after_whitelist_total1+after_whitelist_total2 >= before_whitelist_total1+before_whitelist_total2 and
                                 after_blacklist_total1 + after_blacklist_total2 <= before_blacklist_total1 + before_blacklist_total2 and
                                 motivation_std_before > motivation_std_after and
-                                min_skill_enforcement * min_max_skill_C_prior <= max(p['skill_A'] for p in groups[g2]) and
-                                min_skill_enforcement * min_max_skill_C_prior <= max(p['skill_B'] for p in groups[g2]) and
+                                min_skill_enforcement * min_max_skill_A_prior <= max(p['skill_A'] for p in groups[g2]) and
+                                min_skill_enforcement * min_max_skill_B_prior <= max(p['skill_B'] for p in groups[g2]) and
                                 min_skill_enforcement * min_max_skill_C_prior <= max(p['skill_C'] for p in groups[g2]) and
-                                min_skill_enforcement * min_max_skill_C_prior <= max(p['skill_A'] for p in groups[g1]) and
-                                min_skill_enforcement * min_max_skill_C_prior <= max(p['skill_B'] for p in groups[g1]) and
+                                min_skill_enforcement * min_max_skill_A_prior <= max(p['skill_A'] for p in groups[g1]) and
+                                min_skill_enforcement * min_max_skill_B_prior <= max(p['skill_B'] for p in groups[g1]) and
                                 min_skill_enforcement * min_max_skill_C_prior <= max(p['skill_C'] for p in groups[g1]))
 
                 if not swap_accepted:
@@ -688,7 +736,7 @@ def start_allocation(participants,
                     avg_motivation_std = np.mean([np.std([p['motivation'] for p in group]) for group in groups])
                     motivation_std_records.append((iteration, avg_motivation_std))
                     print(f"Iteration {iteration}: Avg Motivation Std = {avg_motivation_std:.4f}")
-                    print(f"Iteration {iteration}: fitness score = {compute_fitness(groups, skill_cap, min_max_skill_C_prior, min_skill_enforcement, ESL_weight, gender_weight, whitelist_weight, blacklist_weight,motivation_weight,teamwork_weight):.4f}")
+                    print(f"Iteration {iteration}: fitness score = {compute_fitness(groups, skill_cap, min_max_skill_A_prior,min_max_skill_B_prior, min_max_skill_C_prior, min_skill_enforcement, ESL_weight, gender_weight, whitelist_weight, blacklist_weight,motivation_weight,teamwork_weight,basis_motivation,basis_IE,basis_TWS):.4f}")
                     if prev_avg_motivation_std is not None and np.isclose(avg_motivation_std, prev_avg_motivation_std,
                                                                           atol=1e-6):
                         no_change_count += 1
@@ -706,6 +754,8 @@ def start_allocation(participants,
                 num_groups,
                 group_size,
                 skill_cap,
+                min_max_skill_A_prior,
+                min_max_skill_B_prior,
                 min_max_skill_C_prior,
                 min_skill_enforcement,
                 population_size,
@@ -715,7 +765,7 @@ def start_allocation(participants,
                 whitelist_weight,
                 blacklist_weight,
                 motivation_weight,
-                teamwork_weight)
+                teamwork_weight,basis_motivation,basis_IE,basis_TWS)
 
             groups = best_groups
         else:
@@ -859,6 +909,20 @@ class NumberedCanvas(canvas.Canvas):
         self.setFont("Helvetica", 9)
         self.drawRightString(7.5 * inch, 0.75 * inch,
                              f"Page {self._pageNumber} of {page_count}")
+
+#chaange the TOC link to top of page
+class MyHeading(Paragraph):
+    def __init__(self, text, style, bookmark_name, toc_level):
+        super().__init__(text, style)
+        self._bookmarkName = bookmark_name
+        self.toc_level = toc_level
+
+    def draw(self):
+        # Place bookmark *before* drawing heading text
+        self.canv.bookmarkPage(self._bookmarkName)
+        super().draw()
+
+
 
 def generate_reportlab_pdf(groups, num_participants, group_size,filename, elapsed_time, skill_A_name, skill_B_name, skill_C_name, selected_algorithm):
     #variables
@@ -1033,11 +1097,6 @@ def generate_reportlab_pdf(groups, num_participants, group_size,filename, elapse
     story.append(Image(os.path.join(plot_folder, 'avg_skills.png'), width=500, height=250))
     story.append(Spacer(1, 12))
 
-
-
-
-
-
     story.append(heading_with_toc("Maximum Skill Scores in Each Group", styles['Heading2'], level=0))
 
     max_skills_A, max_skills_B, max_skills_C = [], [], []
@@ -1151,6 +1210,9 @@ def generate_reportlab_pdf(groups, num_participants, group_size,filename, elapse
     #teamwork score
     story.append(heading_with_toc("Teamwork score", styles['Heading2'], level=0))
 
+    chart_path = TW_chart(groups)
+    story.append(Image(chart_path, width=500, height=250))
+    story.append(Spacer(1, 12))
 
     for idx, group in enumerate(groups):
         TWS = [p['teamwork'] for p in group]
@@ -1168,9 +1230,7 @@ def generate_reportlab_pdf(groups, num_participants, group_size,filename, elapse
     story.append(Paragraph(f"<b>Mean standard deviation across all groups:</b> {overall_motivation_std_avg:.2f}", styles['Normal']))
     story.append(Spacer(1, 12))
 
-    chart_path = TW_chart(groups)
-    story.append(Image(chart_path, width=500, height=250))
-    story.append(Spacer(1, 12))
+
 
 
     #Whitelist and blacklist
@@ -1822,8 +1882,6 @@ def run_allocation():
     return response
 
 
-from flask import send_file
-import io
 
 #to download report
 @app.route('/download_report')
