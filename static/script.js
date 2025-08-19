@@ -19,6 +19,13 @@ document.getElementById('allocate_btn').onclick = async () => {
   formData.append('max_iterations', document.getElementById('max_iterations').value);
   formData.append('max_generations', document.getElementById('max_generations').value);
   formData.append('population_size', document.getElementById('population_size').value);
+  formData.append('initial_temp', document.getElementById('initial_temp').value);
+  formData.append('final_temp', document.getElementById('final_temp').value);
+  formData.append('alpha', document.getElementById('alpha').value);
+  formData.append('max_iter', document.getElementById('max_iter').value);
+
+
+
   // Output Settings
   formData.append('show_names', document.getElementById('show_names').checked);
   formData.append('show_email', document.getElementById('show_email').checked);

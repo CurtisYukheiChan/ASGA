@@ -337,6 +337,7 @@ fieldset.collapsible.expanded {
         4. Export survey result as .CSV<br>
         5. Upload .CSV file and specify the group size<br>
         6. Change relevant settings to specify which parameters to prioritise when creating groups, then start allocation<br>
+        7. Do not close the tab while allocation is running otherwise output will not be saved<br>
       </p>
       <h2>Survey customization</h2>
       <p>
@@ -348,6 +349,7 @@ fieldset.collapsible.expanded {
       <li>In question for target grade, the answers can be rephrased in any way as long as the beginning of each answer is rated 1-5 e.g. "5. 90-100%", "5. High first class" </li>
       <li>Teamwork questions cannot be edited as the score is mapped to each specific question, but they can be deleted if the orginizer wishes to reduce the length of the survey</li>
       <li>Every question on the survey can be deleted with the exception of name and email if the organizer wishes to shorten the survey</li>
+        <li>Do not add questions on the survey with the exceptions of adding more fields in whitelist or blacklist </li>
     </ul>
       </p>
       <h2>Solver settings</h2>
@@ -386,6 +388,10 @@ fieldset.collapsible.expanded {
       <input type="number" id="group_size" name="group_size" required />
       <label>Upload survey results (CSV/XLSX):</label>
       <input type="file" id="participant_file" accept=".csv,.xlsx" required />
+
+            <div id="progress-container" style="width: 100%; background: #eee;margin-top: 15px; border-radius: 10px; overflow: hidden;">
+  <div id="progress-bar" style="width: 0%; background: #76c7c0; height: 20px;"></div>
+</div>
     </fieldset>
 
     <!-- Advanced Settings -->
@@ -452,18 +458,30 @@ fieldset.collapsible.expanded {
           <option value="combined">Combined</option>
           <option value="local search">Local Search</option>
           <option value="genetic">Genetic</option>
+            <option value="simulated annealing">Simulated Annealing</option>
 
         </select>
         <div id="local_params">
           <label>Max Iterations:</label>
-          <input type="number" id="max_iterations" value="50000" max="100000" />
+          <input type="number" id="max_iterations" value="50000" max="500000" />
         </div>
         <div id="genetic_params" style="display:none;">
           <label>Max Generations:</label>
-          <input type="number" id="max_generations" value="50" max="200" />
+          <input type="number" id="max_generations" value="100" max="500" />
           <label>Population Size:</label>
-          <input type="number" id="population_size" value="10" max="1000"/>
+          <input type="number" id="population_size" value="100" max="1000"/>
       </div>
+                  <div id="simulated_params" style="display:none;">
+          <label>Initial Temperature:</label>
+          <input type="number" id="initial_temp" value="1000" max="5000" />
+          <label>Final Temperature:</label>
+          <input type="number" id="final_temp" value="1" max="100"/>
+                                <label>Alpha:</label>
+          <input type="number" id="alpha" value="0.95" max="0.9999"/>
+                                <label>Max Iterations:</label>
+          <input type="number" id="max_iter" value="1000" max="10000"/>
+      </div>
+
     </fieldset>
 
     <!-- Output Settings -->
@@ -484,6 +502,8 @@ fieldset.collapsible.expanded {
       <button type="button" id="allocate_btn">Start Allocation</button>
       <button onclick="window.open('https://docs.google.com/forms/d/1zEIYqdWtZxNwOmfSCOxW1OSpcuPzKI1moURsTumkGpE/copy', '_blank')">Get Survey Form</button>
     </div>
+
+
 
     <!-- Results -->
     <fieldset>
@@ -588,6 +608,7 @@ fieldset.collapsible.expanded {
 
     document.getElementById('local_params').style.display = (value === 'local search' || value === 'combined') ? 'block' : 'none';
     document.getElementById('genetic_params').style.display = (value === 'genetic') ? 'block' : 'none';
+    document.getElementById('simulated_params').style.display = (value === 'simulated annealing') ? 'block' : 'none';
   });
 
   // Toggle collapse sections// Toggle collapse sections - only one open at a time
@@ -661,6 +682,14 @@ fieldset.collapsible.expanded {
       max_iterations: Number(document.getElementById('max_iterations').value),
       max_generations: Number(document.getElementById('max_generations').value),
       population_size: Number(document.getElementById('population_size').value),
+      initial_temp: Number(document.getElementById('initial_temp').value),
+      final_temp: Number(document.getElementById('final_temp').value),
+      alpha: Number(document.getElementById('alpha').value),
+      max_iter: Number(document.getElementById('max_iter').value),
+
+
+
+
       skill_weight: Number(document.getElementById('skill_weight').value),
       min_skill: Number(document.getElementById('min_skill').value),
       ESL_weight: Number(document.getElementById('ESL_weight').value),
@@ -737,6 +766,32 @@ fieldset.collapsible.expanded {
     }
   };
 
+
+let interval; // store interval globally
+
+function startProgressPolling() {
+  // clear any previous interval
+  if (interval) clearInterval(interval);
+
+  interval = setInterval(() => {
+    fetch('/progress?_=' + new Date().getTime()) // avoid caching
+      .then(res => res.json())
+      .then(data => {
+        const pct = (data.current / data.total) * 100;
+        document.getElementById('progress-bar').style.width = pct + '%';
+        if (data.current >= data.total) clearInterval(interval);
+      });
+  }, 500);
+}
+
+document.getElementById('allocate_btn').addEventListener('click', () => {
+  document.getElementById('progress-bar').style.width = '0%';
+  fetch('/start-allocation'); // tell server to reset current progress
+  startProgressPolling();     // start polling again
+});
+
+// start polling automatically if needed
+startProgressPolling();
 
 </script>
 

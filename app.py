@@ -1,6 +1,5 @@
 #V0.11
-from group_logic import create_groups  
-from flask import Flask, request, render_template, jsonify, send_file, send_from_directory, session
+from flask import Flask, request, render_template, jsonify, send_file, send_from_directory, session, Response
 import pandas as pd
 import logging
 import uuid
@@ -11,6 +10,8 @@ import io
 from collections import Counter, defaultdict
 import os
 from werkzeug.utils import secure_filename
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import os
 import random
@@ -30,7 +31,7 @@ import numpy as np
 import time
 from pylatex import Document, Section, Math
 import math
-from threading import Thread
+import threading
 
 
 from openpyxl import load_workbook
@@ -40,8 +41,12 @@ import copy
 from copy import deepcopy
 import pandas as pd
 
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+#log = logging.getLogger('werkzeug')
+#log.setLevel(logging.WARNING)
+
+
+#logging.basicConfig(level=logging.DEBUG)
+#logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 task_queue = Queue()
@@ -53,6 +58,8 @@ UPDATE_INTERVAL = 50  # milliseconds
 participants=[]
 temp_storage = {}  # server-side store
 app.secret_key = os.urandom(24)
+progress = {"current": 0, "total": 100}
+
 
 
 #Matrix solver
@@ -205,10 +212,12 @@ def mutate(groups, mutation_rate=0.05):
 
 def genetic_algorithm(participants, num_groups, group_size, skill_cap, min_max_skill_A_prior,min_max_skill_B_prior,min_max_skill_C_prior, min_skill_enforcement,
                       population_size, max_generations, groups_sorted_C, ESL_weight, gender_weight,whitelist_weight,blacklist_weight, motivation_weight, teamwork_weight,basis_motivation,basis_IE,basis_TWS):
+    global progress
     population = [copy.deepcopy(groups_sorted_C) for _ in range(population_size)]
     print(f"motivation weight: {motivation_weight}")
 
     for generation in range(max_generations):
+        progress["current"]=generation
         fitnesses = [
             compute_fitness(groups, skill_cap, min_max_skill_A_prior,min_max_skill_B_prior,min_max_skill_C_prior, min_skill_enforcement, ESL_weight, gender_weight,whitelist_weight,blacklist_weight,motivation_weight,teamwork_weight,basis_motivation,basis_IE,basis_TWS)
             for groups in population]
@@ -231,10 +240,151 @@ def genetic_algorithm(participants, num_groups, group_size, skill_cap, min_max_s
 
         # early stopping if convergence is detected
         if generation > 5 and all(np.isclose(f, best_fitness, atol=1e-6) for f in fitnesses[-5:]):
+            progress["current"]=max_generations
             break
 
     best_index = np.argmax(fitnesses)
     return population[best_index]
+
+#simulated annealing
+
+def swap_move(groups):
+    """Swap two participants between two different non-empty groups (preserves group sizes)."""
+    new_groups = copy.deepcopy(groups)
+    non_empty_groups = [i for i, g in enumerate(new_groups) if len(g) > 0]
+
+    if len(non_empty_groups) < 2:
+        # Not enough non-empty groups to swap
+        return new_groups
+
+    g1, g2 = random.sample(non_empty_groups, 2)
+    p1_idx = random.randint(0, len(new_groups[g1]) - 1)
+    p2_idx = random.randint(0, len(new_groups[g2]) - 1)
+
+    # Swap participants
+    new_groups[g1][p1_idx], new_groups[g2][p2_idx] = (
+        new_groups[g2][p2_idx],
+        new_groups[g1][p1_idx],
+    )
+
+    return new_groups
+
+
+def simulated_annealing(groups, participants, compute_fitness,
+                        skill_cap, min_max_skill_A_prior, min_max_skill_B_prior,
+                        min_max_skill_C_prior, min_skill_enforcement,
+                        ESL_weight, gender_weight, whitelist_weight,
+                        blacklist_weight, motivation_weight, teamwork_weight,
+                        basis_motivation, basis_IE, basis_TWS,
+                        initial_temp, final_temp, alpha, max_iter):
+    """
+    Simulated Annealing for grouping problem.
+
+    groups: initial list of groups
+    participants: list of all participant data
+    compute_fitness: function to compute fitness
+    initial_temp: starting temperature
+    final_temp: stopping temperature
+    alpha: cooling rate
+    max_iter: iterations per temperature
+    """
+    #print("checkpoint 5.889")
+    global progress
+    progress["total"]=initial_temp-final_temp
+    progress["current"]=0
+    def random_move(groups):
+        """Randomly swap participants between two groups or move one participant."""
+        new_groups = copy.deepcopy(groups)
+        g1, g2 = random.sample(range(len(new_groups)), 2)
+        if len(new_groups[g1]) == 0:
+            return new_groups
+        # Randomly choose participant from g1
+        p_idx = random.randint(0, len(new_groups[g1]) - 1)
+        participant = new_groups[g1].pop(p_idx)
+        # Randomly insert into g2
+        insert_idx = random.randint(0, len(new_groups[g2]))
+        new_groups[g2].insert(insert_idx, participant)
+        return new_groups
+
+    #print("checkpoint 5.9")
+    current_groups = copy.deepcopy(groups)
+    current_fitness = compute_fitness(current_groups, skill_cap,
+                                      min_max_skill_A_prior, min_max_skill_B_prior,
+                                      min_max_skill_C_prior, min_skill_enforcement,
+                                      ESL_weight, gender_weight, whitelist_weight,
+                                      blacklist_weight, motivation_weight,
+                                      teamwork_weight, basis_motivation,
+                                      basis_IE, basis_TWS)
+
+    best_groups = copy.deepcopy(current_groups)
+    best_fitness = current_fitness
+    #print("checkpoint 5.91")
+
+    temp = initial_temp
+    #print(f" temp = {temp}")
+    #print(f" max iter = {max_iter}")
+    while temp > final_temp:
+        #print("checkpoint 5.9 A 1")
+
+
+        if initial_temp-final_temp-temp>progress["current"]:
+            progress["current"] = initial_temp - final_temp - temp
+            print(progress["current"])
+        else:
+            pass
+
+
+
+
+        for _ in range(max_iter):
+
+            #print("checkpoint 5.9 A 2")
+            try:
+                # Generate candidate
+                #print("checkpoint 5.9 A")
+                candidate_groups = swap_move(current_groups)
+                #print("checkpoint 5.9 B")
+                candidate_fitness = compute_fitness(
+                    candidate_groups, skill_cap,
+                    min_max_skill_A_prior, min_max_skill_B_prior,
+                    min_max_skill_C_prior, min_skill_enforcement,
+                    ESL_weight, gender_weight, whitelist_weight,
+                    blacklist_weight, motivation_weight,
+                    teamwork_weight, basis_motivation,
+                    basis_IE, basis_TWS
+                )
+                #print("checkpoint 5.912")
+                delta = candidate_fitness - current_fitness
+
+                # Safe probability calculation
+                prob = 0
+               # print("checkpoint 5.915")
+                if temp > 1e-9:  # prevent division by zero
+                    try:
+                        prob = math.exp(delta / temp)
+                    except OverflowError:
+                        prob = 1.0 if delta > 0 else 0.0  # huge positive delta always accept
+                #print("checkpoint 5.917")
+                # Accept move
+                if delta > 0 or random.random() < prob:
+                    current_groups = candidate_groups
+                    current_fitness = candidate_fitness
+
+                    # Update best
+                    if current_fitness > best_fitness:
+                        best_groups = copy.deepcopy(current_groups)
+                        best_fitness = current_fitness
+
+            except Exception as e:
+                # Catch any unexpected errors but keep loop running
+                print(f"⚠️ Error at temp={temp}, delta={delta if 'delta' in locals() else 'NA'}: {e}")
+                continue
+
+        temp *= alpha  # cool down
+    #print("checkpoint 5.92")
+    return best_groups, best_fitness
+
+
 
 
 # sub algorithm
@@ -448,9 +598,11 @@ def start_allocation(participants,
             whitelist_weight,
             blacklist_weight,
             motivation_weight,
-            teamwork_weight         ):
+            teamwork_weight,initial_temp, final_temp, alpha, max_iter         ):
     global elapsed_time
+    global progress
     min_skill_enforcement=min_skill
+    progress["current"] = 0
 
 
 
@@ -467,27 +619,30 @@ def start_allocation(participants,
 
         MAX_ITERATIONS = max_iterations
 
-        print("checckpoint 2.5")
+        print("checkpoint 2.5")
 
         try:
             print(f"num participants = {num_participants}, group_size = {group_size}")
-            MIN_ITERATIONS = math.floor(
-                math.log10(math.log10(ways_with_leftovers(num_participants, group_size))) * 10000 * 1.5
-            )
+            try:
+                ways = ways_with_leftovers(num_participants, group_size)
+                MIN_ITERATIONS = math.floor(
+                    math.log10(math.log10(ways)) * 10000 * 1.5
+                )
+            except OverflowError:
+                print("⚠ Overflow detected, using fallback MIN_ITERATIONS")
+                MIN_ITERATIONS = max_iterations  # your safe default
+            except ValueError:
+                print("⚠ Invalid math domain, using fallback MIN_ITERATIONS")
+                MIN_ITERATIONS = max_iterations
 
             print("MIN_ITERATIONS:", MIN_ITERATIONS)
 
-
-        except ValueError:
-            messagebox.showerror("Input Error", "Please enter valid numbers for participants and group size.")
         except Exception as e:
-            messagebox.showerror("Error2", str(e))
+            print("Unexpected error:", e)
+            MIN_ITERATIONS = max_iterations
         print("checkpoint 3")
-        # Iteration calculation based on number of combination
-        MIN_ITERATIONS = math.floor(
-            math.log10(math.log10(ways_with_leftovers(num_participants, group_size))) * 10000 * 1.5)
 
-        if MIN_ITERATIONS < MAX_ITERATIONS:
+        if MIN_ITERATIONS < MAX_ITERATIONS and MIN_ITERATIONS > 1000:
             MAX_ITERATIONS = MIN_ITERATIONS
         else:
             pass
@@ -586,13 +741,13 @@ def start_allocation(participants,
 
         # Local Search
         current_range = compute_max_skill(groups)
-
+        print("checkpoint 5.2")
         checkpoints = set(int(MAX_ITERATIONS * i / 20) for i in range(1, 21))  # 5%, 10%, ..., 100%
         prev_avg_motivation_std = None
         no_change_count = 0
         motivation_std_records = []
         #print("Check point 3")
-
+        print("checkpoint 5.4")
         average_motivation_std_basis=[]
         for group in groups:
             if len(group) > 2:
@@ -601,7 +756,7 @@ def start_allocation(participants,
             else:
                 average_motivation_std_basis.append(1)
         basis_motivation=np.mean(average_motivation_std_basis)
-
+        print("checkpoint 5.6")
 
         basis_TWS = np.std([
             np.mean([p['teamwork'] for p in group])
@@ -615,7 +770,7 @@ def start_allocation(participants,
             if len(group) >= 2
         ]) if any(len(group) >= 2 for group in groups) else 1
 
-
+        print("checkpoint 5.8")
         if math.isnan(basis_motivation) or basis_motivation == 0:
             basis_motivation=1
         if math.isnan(basis_TWS) or basis_TWS == 0:
@@ -623,8 +778,23 @@ def start_allocation(participants,
         if math.isnan(basis_IE) or basis_IE == 0:
             basis_IE=1
 
+        print("checkpoint 5.85")
         if selected_algorithm in ("local search", "combined"):
-            #print("Check point 4")
+            progress["total"] = MAX_ITERATIONS
+
+        elif selected_algorithm == "simulated annealing":
+            progress["total"] = initial_temp-final_temp
+        else:
+            progress["total"] = max_generations
+
+
+
+        fitness_score_history=[]
+        progress["current"] = 0
+
+        print("checkpoint 5.87")
+        if selected_algorithm in ("local search", "combined"):
+            print("Check point 4")
 
             for iteration in range(MAX_ITERATIONS):
                 # Select two random participants from different groups
@@ -695,7 +865,7 @@ def start_allocation(participants,
                         for group in groups
                         if len(group) >= 2
                     ]) if any(len(group) >= 2 for group in groups) else 0
-                #print("Check point 5")
+                #print("Check point 51")
                 if selected_algorithm == "local search":
                     if group_size >= 4:
                         swap_accepted = (
@@ -731,10 +901,12 @@ def start_allocation(participants,
                     groups[g1][i1], groups[g2][i2] = groups[g2][i2], groups[g1][i1]
 
                 # Early stopping logic
-                #print("Check point 6")
+                #print("Check point 61")
                 if iteration in checkpoints:
                     avg_motivation_std = np.mean([np.std([p['motivation'] for p in group]) for group in groups])
                     motivation_std_records.append((iteration, avg_motivation_std))
+                    fitness_score_history.append((iteration, float(round(compute_fitness(groups, skill_cap, min_max_skill_A_prior,min_max_skill_B_prior, min_max_skill_C_prior, min_skill_enforcement, ESL_weight, gender_weight, whitelist_weight, blacklist_weight,motivation_weight,teamwork_weight,basis_motivation,basis_IE,basis_TWS),2))))
+                    progress["current"]=iteration
                     print(f"Iteration {iteration}: Avg Motivation Std = {avg_motivation_std:.4f}")
                     print(f"Iteration {iteration}: fitness score = {compute_fitness(groups, skill_cap, min_max_skill_A_prior,min_max_skill_B_prior, min_max_skill_C_prior, min_skill_enforcement, ESL_weight, gender_weight, whitelist_weight, blacklist_weight,motivation_weight,teamwork_weight,basis_motivation,basis_IE,basis_TWS):.4f}")
                     if prev_avg_motivation_std is not None and np.isclose(avg_motivation_std, prev_avg_motivation_std,
@@ -745,6 +917,7 @@ def start_allocation(participants,
                     prev_avg_motivation_std = avg_motivation_std
                     if no_change_count >= 3:
                         print(f"Early stopping at iteration {iteration} after {no_change_count} unchanged checkpoints.")
+                        progress["current"] = MAX_ITERATIONS
                         break
 
         # Genetic algo
@@ -768,6 +941,33 @@ def start_allocation(participants,
                 teamwork_weight,basis_motivation,basis_IE,basis_TWS)
 
             groups = best_groups
+        elif selected_algorithm == "simulated annealing":
+            print("checkpoint 5.88")
+            #threading.Thread(                target=simulated_annealing,  args=(groups, participants, compute_fitness,
+                      #skill_cap, min_max_skill_A_prior, min_max_skill_B_prior,
+                      #min_max_skill_C_prior, min_skill_enforcement,
+                      #ESL_weight, gender_weight, whitelist_weight,
+                      #blacklist_weight, motivation_weight, teamwork_weight,
+                      #basis_motivation, basis_IE, basis_TWS,
+                      #initial_temp, final_temp, alpha, max_iter),
+                #daemon=True
+            #).start()
+
+
+            best_groups, best_score = simulated_annealing(
+                groups, participants, compute_fitness,
+                skill_cap, min_max_skill_A_prior, min_max_skill_B_prior, min_max_skill_C_prior,
+                min_skill_enforcement, ESL_weight, gender_weight, whitelist_weight,
+                blacklist_weight, motivation_weight, teamwork_weight,
+                basis_motivation, basis_IE, basis_TWS, initial_temp, final_temp, alpha, max_iter)
+            print(f"best score: {best_score}")
+            print("checkpoint 5.887")
+            groups = best_groups
+            fitness_score_history.append((1, best_score,3))
+            print("checkpoint 5.888")
+
+            print(f"fitness score history: {fitness_score_history}")
+
         else:
             print("Algo error")
 
@@ -866,7 +1066,7 @@ def start_allocation(participants,
 
         # Direct Excel file download
 
-        return output, groups
+        return output, groups, fitness_score_history
 
     except Exception as e:
         return jsonify({'error': str(e)}), 400
@@ -924,7 +1124,7 @@ class MyHeading(Paragraph):
 
 
 
-def generate_reportlab_pdf(groups, num_participants, group_size,filename, elapsed_time, skill_A_name, skill_B_name, skill_C_name, selected_algorithm):
+def generate_reportlab_pdf(groups, num_participants, group_size,filename, elapsed_time, skill_A_name, skill_B_name, skill_C_name, selected_algorithm, fitness_score_history):
     #variables
 
 
@@ -1273,14 +1473,26 @@ def generate_reportlab_pdf(groups, num_participants, group_size,filename, elapse
     story.append(Paragraph(f"<b> Algorithm:</b> {selected_algorithm}", styles['Normal']))
     total_participants = sum(len(g) for g in groups)
     story.append(Paragraph(f"<b>Total number of participants:</b> {total_participants}", styles['Normal']))
-    story.append(Paragraph(
-        f"<b>Total possible combinations for grouping:</b> {ways_with_leftovers(num_participants, group_size):.3e}",
-        styles['Normal']))
+
+
+    try:
+        ways=ways_with_leftovers(num_participants, group_size)
+        story.append(Paragraph(
+            f"<b>Total possible combinations for grouping:</b> {ways:.3e}",
+            styles['Normal']))
+    except Exception as e:
+        story.append(Paragraph(
+            f"<b>Total possible combinations for grouping:</b> Overflow error, 10^300 or larger",
+            styles['Normal']))
+
+
+
+
     story.append(Paragraph(
         f"<b>Total runtime:</b> {elapsed_time} seconds",
         styles['Normal']))
 
-
+    story.append(Paragraph(f"<b>fitness score in iteration: {fitness_score_history} </b>"))
 
     # Build PDF
     doc.multiBuild(story)
@@ -1417,8 +1629,10 @@ def TW_chart(groups):
 
 @app.route('/run_allocation', methods=['POST'])
 def run_allocation():
+
     print('Form data:', request.form)
     print('Files:', request.files)
+    progress = {"current": 0, "total": 100}
     try:
         def handle_uploaded_file():
             # Get uploaded file
@@ -1486,6 +1700,12 @@ def run_allocation():
         gender_weight = float(settings.get('gender_weight', 0.8))
         rounding_mode = bool(settings.get('rounding_mode', True))
         selected_algorithm = settings.get('algorithm', 'local search')
+        initial_temp = float(settings.get('initial_temp', 500))
+        final_temp = float(settings.get('final_temp', 1))
+        alpha = float(settings.get('alpha', 0.95))
+        max_iter = int(settings.get('max_iter', 500))
+
+
 
         show_names = bool(settings.get('show_names', True))
         show_email = bool(settings.get('show_email', True))
@@ -1736,10 +1956,10 @@ def run_allocation():
                     # Normalization (0 to 10)
                     normalized = (original - min_val) / (max_val - min_val)
                     # Final score = original + normalized * 5
-                    final = original + (normalized * 5)
+                    final = original + (normalized * 4)+1
                 else:
                     # All skills are equal, use 0.33 * 5 instead of normalization
-                    final = original + (0.33 * 5)
+                    final = original + (0.33 * 4)+1
 
                 return pd.Series(final, index=[skill_A, skill_B, skill_C])
 
@@ -1769,6 +1989,11 @@ def run_allocation():
         #fix nan or errors
         for p in participants:
             # If personality is NaN or not a number, set to 0
+            if not isinstance(p['IE'], (int, float)) or pd.isna(p['IE']):
+                p['IE'] = 0.0
+
+        for p in participants:
+            # If personality is NaN or not a number, set to 0
             if not isinstance(p['personality'], (int, float)) or pd.isna(p['personality']):
                 p['personality'] = 0.0
 
@@ -1795,7 +2020,7 @@ def run_allocation():
 
         try:
             print("checkpoint 2")
-            excel_buffer,groups = start_allocation(
+            excel_buffer,groups,fitness_score_history = start_allocation(
                 participants,
                 academic_weight,
                 normalise_mode,
@@ -1818,7 +2043,8 @@ def run_allocation():
                 blacklist_weight,
                 whitelist_weight,
                 motivation_weight,
-                teamwork_weight
+                teamwork_weight,
+                initial_temp, final_temp, alpha, max_iter
             )
             print("start_allocation returned:", type(excel_buffer))
             print("Type of groups:", type(groups))
@@ -1830,7 +2056,8 @@ def run_allocation():
                 'skill_A_name': skill_A_name,
                 'skill_B_name':skill_B_name,
                 'skill_C_name': skill_C_name,
-                'selected_algorithm':selected_algorithm
+                'selected_algorithm':selected_algorithm,
+                'fitness_score_history': fitness_score_history
             }
 
 
@@ -1898,14 +2125,21 @@ def download_report():
     skill_B_name=data['skill_B_name']
     skill_C_name=data['skill_C_name']
     selected_algorithm=data['selected_algorithm']
+    fitness_score_history = data['fitness_score_history']
 
     num_participants=max(p["id"] for group in groups for p in group)
 
+    temp_storage.pop(data_id, None)  # None avoids KeyError if missing
 
     try:
-        pdf_buffer = generate_reportlab_pdf(groups, num_participants, group_size, filename=None,elapsed_time=elapsed_time, skill_A_name=skill_A_name, skill_B_name=skill_B_name, skill_C_name=skill_C_name, selected_algorithm=selected_algorithm)
+        pdf_buffer = generate_reportlab_pdf(groups, num_participants, group_size, filename=None,elapsed_time=elapsed_time, skill_A_name=skill_A_name, skill_B_name=skill_B_name, skill_C_name=skill_C_name, selected_algorithm=selected_algorithm, fitness_score_history=fitness_score_history)
         print("pdf_buffer type:", type(pdf_buffer))
         print("pdf_buffer:", pdf_buffer)
+        try:
+            del groups
+        except NameError:
+            pass
+
         if not hasattr(pdf_buffer, 'seek'):
             raise ValueError("Invalid PDF buffer returned")
         return send_file(
@@ -1930,7 +2164,16 @@ def favicon():
 @app.route('/dice')
 def dice():
     return render_template('dice.html')
+@app.teardown_appcontext
+def cleanup(exception=None):
+    import gc
+    gc.collect()
+
+@app.route("/progress")
+def get_progress():
+    return jsonify(progress)
 
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000)
+    print(f" * Running on http://{host}:{port}/")  # manual server URL
