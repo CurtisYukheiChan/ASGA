@@ -15,6 +15,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import os
 import random
+import gc
+from threading import Timer
 import tempfile
 import json
 from reportlab.lib.pagesizes import letter
@@ -610,16 +612,16 @@ def start_allocation(participants,
     print(f"Selected algorithm: {selected_algorithm}")
 
     if rounding_mode == True:
-        print("true")
+        print("rounding mode true")
     else:
-        print("false")
+        print("rounding mode false")
 
     try:
         start_time = time.time()  # Start timer
 
         MAX_ITERATIONS = max_iterations
 
-        print("checkpoint 2.5")
+        #print("checkpoint 2.5")
 
         try:
             print(f"num participants = {num_participants}, group_size = {group_size}")
@@ -640,7 +642,7 @@ def start_allocation(participants,
         except Exception as e:
             print("Unexpected error:", e)
             MIN_ITERATIONS = max_iterations
-        print("checkpoint 3")
+        #print("checkpoint 3")
 
         if MIN_ITERATIONS < MAX_ITERATIONS and MIN_ITERATIONS > 1000:
             MAX_ITERATIONS = MIN_ITERATIONS
@@ -658,11 +660,16 @@ def start_allocation(participants,
         # Sort participants by skill A level
         participants = sorted(participants, key=lambda p: p['skill_A'], reverse=True)
         #print("Check point 1")
-
+        print(f"number of groups = {num_groups}")
         while len(group_list) < num_groups:
             group_list.append([])  # Create empty groups as needed
         for i in range(0, num_groups):
             group_list[i].append(participants[i])
+
+        people_in_group = []
+        for group in group_list:
+            people_in_group.append(len(group))
+        print(f"people in group A {people_in_group}")
 
         # sort existing group by skill B level, then assign remaining participants by skill B level to weakest skill B team first
         groups_sorted_B = sorted(group_list, key=lambda g: max(p['skill_B'] for p in g))
@@ -673,6 +680,11 @@ def start_allocation(participants,
         participants = [p for p in participants if p['id'] not in removal_list]
 
         participants = sorted(participants, key=lambda p: p['skill_B'], reverse=True)
+
+        people_in_group=[]
+        for group in groups_sorted_B:
+            people_in_group.append(len(group))
+        print(f"people in group B {people_in_group}")
 
         if len(participants) >= num_groups:
             for i in range(0, num_groups):
@@ -700,7 +712,7 @@ def start_allocation(participants,
             participants = [p for p in participants if p['id'] not in removal_list]
         else:
             pass
-        print("checkpoint 4")
+        #print("checkpoint 4")
         # Assign participants round robin
         #print("Check point 2")
         for i, participant in enumerate(participants):
@@ -712,7 +724,7 @@ def start_allocation(participants,
         max_skills_A = []
         max_skills_B = []
         max_skills_C = []
-        print("checkpoint 4.2")
+        #print("checkpoint 4.2")
         for group in groups:
             max_skill_A = max(p['skill_A'] for p in group)
             max_skill_B = max(p['skill_B'] for p in group)
@@ -723,31 +735,37 @@ def start_allocation(participants,
             max_skills_C.append(max_skill_C)
             if not group:
                 continue
-        print("checkpoint 4.5")
+        #print("checkpoint 4.5")
         min_max_skill_A_prior = min(max_skills_A)
         min_max_skill_B_prior = min(max_skills_B)
         min_max_skill_C_prior = min(max_skills_C)
 
 
-        print("checkpoint 4.7")
-        NUM_GROUPS = num_participants // group_size
+        #print("checkpoint 4.7")
+        NUM_GROUPS = num_groups
         skill_cap = np.floor(compute_max_skill(groups) * skill_weight)
-        print("checkpoint 5")
+        #print("checkpoint 5")
         def compute_range(groups):
             avg_scores = [np.mean([p['motivation'] for p in group]) for group in groups]
             return max(avg_scores) - min(avg_scores)
 
         print(compute_max_skill(groups))
 
+
+        people_in_group=[]
+        for group in groups:
+            people_in_group.append(len(group))
+        print(f"people in group C {people_in_group}")
+
         # Local Search
         current_range = compute_max_skill(groups)
-        print("checkpoint 5.2")
+        #print("checkpoint 5.2")
         checkpoints = set(int(MAX_ITERATIONS * i / 20) for i in range(1, 21))  # 5%, 10%, ..., 100%
         prev_avg_motivation_std = None
         no_change_count = 0
         motivation_std_records = []
         #print("Check point 3")
-        print("checkpoint 5.4")
+        #print("checkpoint 5.4")
         average_motivation_std_basis=[]
         for group in groups:
             if len(group) > 2:
@@ -756,7 +774,7 @@ def start_allocation(participants,
             else:
                 average_motivation_std_basis.append(1)
         basis_motivation=np.mean(average_motivation_std_basis)
-        print("checkpoint 5.6")
+        #print("checkpoint 5.6")
 
         basis_TWS = np.std([
             np.mean([p['teamwork'] for p in group])
@@ -770,7 +788,7 @@ def start_allocation(participants,
             if len(group) >= 2
         ]) if any(len(group) >= 2 for group in groups) else 1
 
-        print("checkpoint 5.8")
+        #print("checkpoint 5.8")
         if math.isnan(basis_motivation) or basis_motivation == 0:
             basis_motivation=1
         if math.isnan(basis_TWS) or basis_TWS == 0:
@@ -778,7 +796,7 @@ def start_allocation(participants,
         if math.isnan(basis_IE) or basis_IE == 0:
             basis_IE=1
 
-        print("checkpoint 5.85")
+        #print("checkpoint 5.85")
         if selected_algorithm in ("local search", "combined"):
             progress["total"] = MAX_ITERATIONS
 
@@ -792,9 +810,9 @@ def start_allocation(participants,
         fitness_score_history=[]
         progress["current"] = 0
 
-        print("checkpoint 5.87")
+        #print("checkpoint 5.87")
         if selected_algorithm in ("local search", "combined"):
-            print("Check point 4")
+            #print("Check point 4")
 
             for iteration in range(MAX_ITERATIONS):
                 # Select two random participants from different groups
@@ -942,7 +960,7 @@ def start_allocation(participants,
 
             groups = best_groups
         elif selected_algorithm == "simulated annealing":
-            print("checkpoint 5.88")
+            #print("checkpoint 5.88")
             #threading.Thread(                target=simulated_annealing,  args=(groups, participants, compute_fitness,
                       #skill_cap, min_max_skill_A_prior, min_max_skill_B_prior,
                       #min_max_skill_C_prior, min_skill_enforcement,
@@ -961,10 +979,10 @@ def start_allocation(participants,
                 blacklist_weight, motivation_weight, teamwork_weight,
                 basis_motivation, basis_IE, basis_TWS, initial_temp, final_temp, alpha, max_iter)
             print(f"best score: {best_score}")
-            print("checkpoint 5.887")
+            #print("checkpoint 5.887")
             groups = best_groups
             fitness_score_history.append((1, best_score,3))
-            print("checkpoint 5.888")
+            #print("checkpoint 5.888")
 
             print(f"fitness score history: {fitness_score_history}")
 
@@ -1698,7 +1716,7 @@ def run_allocation():
         skill_weight = float(settings.get('skill_weight', 0.9))
         min_skill = float(settings.get('min_skill', 0.8))
         gender_weight = float(settings.get('gender_weight', 0.8))
-        rounding_mode = bool(settings.get('rounding_mode', True))
+        rounding_mode = settings.get("rounding_mode", True)
         selected_algorithm = settings.get('algorithm', 'local search')
         initial_temp = float(settings.get('initial_temp', 500))
         final_temp = float(settings.get('final_temp', 1))
@@ -2008,7 +2026,7 @@ def run_allocation():
 
         # Build email and id lookup
         email_to_id = {p['email']: p['id'] for p in participants}
-        print("checkpoint 1")
+        #print("checkpoint 1")
         # Replace emails with IDs in whitelist and blacklist
         for p in participants:
             p['whitelist'] = [email_to_id[email] for email in p['whitelist'] if email in email_to_id][:whitelist_limit]
@@ -2019,7 +2037,7 @@ def run_allocation():
         print(f"inital group size: {group_size}")
 
         try:
-            print("checkpoint 2")
+            #print("checkpoint 2")
             excel_buffer,groups,fitness_score_history = start_allocation(
                 participants,
                 academic_weight,
@@ -2071,7 +2089,6 @@ def run_allocation():
             as_attachment=True,
             download_name='groups.xlsx'
         )
-
         try:
             # --- Clean uploads ---
             uploads_folder = 'uploads'
@@ -2108,6 +2125,15 @@ def run_allocation():
 
     return response
 
+#ram management
+def clear_temp_storage():
+    temp_storage.clear()  # removes all references
+    gc.collect()          # garbage truck
+    # schedule next cleanup in seconds
+    Timer(3600*24, clear_temp_storage).start()
+
+# start the cycle
+clear_temp_storage()
 
 
 #to download report
@@ -2130,6 +2156,7 @@ def download_report():
     num_participants=max(p["id"] for group in groups for p in group)
 
     temp_storage.pop(data_id, None)  # None avoids KeyError if missing
+    data = temp_storage.pop(data_id, None)
 
     try:
         pdf_buffer = generate_reportlab_pdf(groups, num_participants, group_size, filename=None,elapsed_time=elapsed_time, skill_A_name=skill_A_name, skill_B_name=skill_B_name, skill_C_name=skill_C_name, selected_algorithm=selected_algorithm, fitness_score_history=fitness_score_history)
@@ -2148,6 +2175,8 @@ def download_report():
             download_name='groups_report.pdf',
             mimetype='application/pdf'
         )
+
+
     except Exception as e:
         raise RuntimeError(f"Error generating PDF: {str(e)}")
 

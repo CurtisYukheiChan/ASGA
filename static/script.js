@@ -25,6 +25,10 @@ document.getElementById('allocate_btn').onclick = async () => {
   formData.append('max_iter', document.getElementById('max_iter').value);
 
 
+    const roundingMode = document.getElementById('rounding_toggle').textContent.includes('Down');
+
+formData.append('rounding_mode', roundingMode);
+
 
   // Output Settings
   formData.append('show_names', document.getElementById('show_names').checked);

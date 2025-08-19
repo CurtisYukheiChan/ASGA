@@ -353,7 +353,7 @@ fieldset.collapsible.expanded {
     </ul>
       </p>
       <h2>Solver settings</h2>
-      Combined algorithm is recommended as it generates groupings in the most balanced manner. Local search is the fastest but tends to get stuck at local minima and does not take weightings into account.
+      Simulated annealing is recommended for class size under 250 students for creating the best groupings (solve time 3-10 minutes). Instability issues might occur with larger class size, reduce max iterations for large class sizes down to 100-250. Combined algorithm is the second best in terms of results with solve time typically under a minute. Local search is the fastest but tends to get stuck at local minima and does not take weightings into account.
       Genetic is the slowest and is not recommended as the search is too global.
       <h2>Advanced settings</h2>
       Weightings are used to tell the algorithm what variables the organizer deem is more important than others when creating groups. Normalise technical skill score should be enabled when the majority of participants have a low level of confidence/experience in their relevant skill level.
@@ -455,10 +455,11 @@ fieldset.collapsible.expanded {
         <legend>Solver Settings</legend>
         <label>Algorithm:</label>
         <select id="algorithm">
+            <option value="simulated annealing">Simulated Annealing</option>
           <option value="combined">Combined</option>
           <option value="local search">Local Search</option>
           <option value="genetic">Genetic</option>
-            <option value="simulated annealing">Simulated Annealing</option>
+
 
         </select>
         <div id="local_params">
@@ -575,13 +576,23 @@ fieldset.collapsible.expanded {
 
 
 
-  // Rounding toggle
-  const roundingBtn = document.getElementById('rounding_toggle');
-  roundingBtn.addEventListener('click', () => {
-    roundingBtn.textContent = roundingBtn.textContent.includes('Down') ?
-            'Rounding number of groups: Up' :
-            'Rounding number of groups: Down';
-  });
+// Get the button element
+const roundingBtn = document.getElementById('rounding_toggle');
+
+// Function to check current rounding mode
+function getRoundingMode() {
+  return roundingBtn.textContent.includes('Down');
+}
+
+// Set up click listener to toggle the text
+roundingBtn.addEventListener('click', () => {
+  roundingBtn.textContent = getRoundingMode() ?
+    'Rounding number of groups: Up' :
+    'Rounding number of groups: Down';
+
+  // Optional: log the current mode after toggling
+  console.log('Rounding mode is now:', getRoundingMode());
+});
 
   //how to use window
      const modal = document.getElementById("termsModal");
@@ -603,13 +614,21 @@ fieldset.collapsible.expanded {
 
 
   // Algorithm change
-  document.getElementById('algorithm').addEventListener('change', e => {
-    const value = e.target.value;
+function updateParams(value) {
+  document.getElementById('simulated_params').style.display = (value === 'simulated annealing') ? 'block' : 'none';
+  document.getElementById('local_params').style.display = (value === 'local search' || value === 'combined') ? 'block' : 'none';
+  document.getElementById('genetic_params').style.display = (value === 'genetic') ? 'block' : 'none';
+}
 
-    document.getElementById('local_params').style.display = (value === 'local search' || value === 'combined') ? 'block' : 'none';
-    document.getElementById('genetic_params').style.display = (value === 'genetic') ? 'block' : 'none';
-    document.getElementById('simulated_params').style.display = (value === 'simulated annealing') ? 'block' : 'none';
-  });
+const algorithmSelect = document.getElementById('algorithm');
+
+// Run once on page load
+updateParams(algorithmSelect.value);
+
+// Update when user changes dropdown
+algorithmSelect.addEventListener('change', e => updateParams(e.target.value));
+
+
 
   // Toggle collapse sections// Toggle collapse sections - only one open at a time
   document.querySelectorAll('.toggle-btn').forEach(btn => {
@@ -705,7 +724,9 @@ fieldset.collapsible.expanded {
       show_gender: document.getElementById('show_gender').checked,
       show_ESL: document.getElementById('show_ESL').checked,
       show_report: document.getElementById('show_report').checked,
-      normalise_skill: document.getElementById('normalise_skill').checked
+      normalise_skill: document.getElementById('normalise_skill').checked,
+
+      rounding_mode: roundingBtn.textContent.includes('Down')
     };
     formData.append('settings', JSON.stringify(settings));
 
